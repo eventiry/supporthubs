@@ -1,0 +1,44 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "preserve",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowJs": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "plugins": [{ "name": "next" }]
+  },
+  "include": [
+    "app/**/*.ts",
+    "app/**/*.tsx",
+    "lib/**/*.ts",
+    "prisma/**/*.ts",
+    "components/button.tsx",
+    "components/card.tsx",
+    "components/input.tsx",
+    "components/label.tsx",
+    "components/table.tsx",
+    "components/utils.ts",
+    "components/layout/**/*.tsx",
+    "components/voucher-detail-view.tsx",
+    "components/alert-dialog.tsx",
+    "components/dialog.tsx",
+    "components/create-client-form.tsx",
+    "components/ui/loading.tsx",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules"]
+}

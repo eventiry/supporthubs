@@ -1,0 +1,386 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  super_admin  // Platform admin (organizationId must be null)
+  admin        // Organization (tenant) admin
+  third_party
+  back_office
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+}
+
+enum VoucherStatus {
+  issued
+  redeemed
+  expired
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+  ISSUE_VOUCHER
+  REDEEM_VOUCHER
+}
+
+enum OrganizationStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  CANCELLED
+}
+
+enum InvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+}
+
+enum SubscriptionStatus {
+  none
+  trialing
+  active
+  past_due
+  cancelled
+}
+
+model SubscriptionPlan {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  tier          String   // e.g. starter, growth, enterprise
+  description   String?  // Short copy for pricing page
+  features      Json?    // ["Feature one", "Feature two"] — industry standard feature list
+  limits        Json     // { maxUsers?, maxAgencies?, maxVouchersPerMonth? }
+  priceMonthly  Decimal? @db.Decimal(10, 2)
+  priceYearly   Decimal? @db.Decimal(10, 2)
+  active        Boolean  @default(true)
+  stripeProductId   String? @unique // Set when Stripe Product is created for this plan (enables new Price on update)
+  stripePriceId     String? @unique // Primary Stripe Price ID (monthly or yearly) for webhook plan mapping
+  stripePriceIdYearly String? @unique // Yearly Price ID when both monthly and yearly are set; webhook matches either
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organizations Organization[]
+  subscriptions  Subscription[]
+
+  @@map("subscription_plans")
+}
+
+/// Records every subscription lifecycle event from Stripe (industry standard: dedicated subscription table).
+/// One row per Stripe subscription; Organization keeps denormalized fields for fast reads.
+model Subscription {
+  id                    String             @id @default(cuid())
+  organizationId        String
+  stripeSubscriptionId  String             @unique
+  stripeCustomerId      String?
+  subscriptionPlanId    String?
+  status                SubscriptionStatus
+  currentPeriodStart    DateTime?
+  currentPeriodEnd      DateTime?
+  cancelAtPeriodEnd     Boolean            @default(false)
+  cancelledAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  subscriptionPlan SubscriptionPlan? @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([stripeCustomerId])
+  @@map("subscriptions")
+}
+
+model Organization {
+  id             String             @id @default(cuid())
+  slug           String             @unique
+  name           String
+  status         OrganizationStatus @default(PENDING)
+  logoUrl        String?
+  primaryColor   String?
+  secondaryColor String?
+  description    String?            // About the organization (tenant branding)
+  brandingDisplay String?            @default("both") // "logo" | "name" | "both" — sidebar, header, login
+  subscriptionPlanId     String?
+  subscriptionStatus     SubscriptionStatus @default(none)
+  billingEmail          String?
+  subscriptionStartedAt  DateTime?
+  subscriptionEndsAt     DateTime?
+  stripeCustomerId      String?       @unique // For webhook: link Stripe customer to org
+  stripeSubscriptionId  String?       @unique // For webhook: idempotent subscription updates
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+
+  subscriptionPlan     SubscriptionPlan?  @relation(fields: [subscriptionPlanId], references: [id], onDelete: SetNull)
+  subscriptions        Subscription[]
+  users            User[]
+  agencies         Agency[]
+  foodBankCenters  FoodBankCenter[]
+  clients          Client[]
+  referralDetails  ReferralDetails[]
+  vouchers         Voucher[]
+  auditLogs        AuditLog[]
+
+  @@index([subscriptionPlanId])
+  @@map("organizations")
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String
+  firstName       String
+  lastName        String
+  role            UserRole
+  agencyId        String?
+  organizationId  String?    // null = platform admin
+  status          UserStatus @default(ACTIVE)
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  organization     Organization?         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  agency           Agency?               @relation(fields: [agencyId], references: [id], onDelete: SetNull)
+  vouchersIssued   Voucher[]              @relation("IssuedBy")
+  redemptions      Redemption[]
+  auditLogs        AuditLog[]
+  passwordResets   PasswordResetToken[]
+  sessions         Session[]
+  invitationsCreated Invitation[]
+
+  @@index([agencyId])
+  @@index([organizationId])
+  @@index([role])
+  @@index([email])
+  @@map("users")
+}
+
+model Invitation {
+  id               String           @id @default(cuid())
+  email            String
+  organizationName String
+  subdomainSlug   String
+  token           String           @unique
+  expiresAt       DateTime
+  status           InvitationStatus @default(PENDING)
+  createdById     String
+  createdAt       DateTime         @default(now())
+
+  createdBy User @relation(fields: [createdById], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([createdById])
+  @@index([expiresAt])
+  @@map("invitations")
+}
+
+model ContactSubmission {
+  id               String   @id @default(cuid())
+  name             String
+  email            String
+  organizationName String
+  message          String
+  wantToUse        Boolean  @default(false)
+  createdAt        DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([email])
+  @@map("contact_submissions")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([sessionToken])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([tokenHash])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model Agency {
+  id            String   @id @default(cuid())
+  name          String
+  contactPhone  String?
+  contactEmail   String?
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  users        User[]
+  vouchers     Voucher[]
+
+  @@index([organizationId])
+  @@map("agencies")
+}
+
+model Client {
+  id              String    @id @default(cuid())
+  firstName       String
+  surname         String
+  postcode        String?
+  noFixedAddress  Boolean   @default(false)
+  address         String?
+  yearOfBirth     Int?
+  householdAdults Json?
+  householdChild  Json?
+  organizationId  String
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vouchers     Voucher[]
+
+  @@index([organizationId])
+  @@index([surname, postcode])
+  @@index([noFixedAddress])
+  @@map("clients")
+}
+
+model ReferralDetails {
+  id                      String   @id @default(cuid())
+  notes                   String   @db.VarChar(400)
+  incomeSource            String?
+  referralReasons         Json?
+  ethnicGroup             String?
+  householdByAge          Json?
+  contactConsent          Boolean  @default(false)
+  dietaryConsent          Boolean  @default(false)
+  dietaryRequirements     String?
+  moreThan3VouchersReason String?
+  parcelNotes             String?  @db.VarChar(400)
+  organizationId          String
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vouchers     Voucher[]
+
+  @@index([organizationId])
+  @@map("referral_details")
+}
+
+model FoodBankCenter {
+  id             String   @id @default(cuid())
+  name           String
+  address        String?
+  postcode       String?
+  phone          String?
+  email          String?
+  canDeliver     Boolean  @default(false)
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  vouchers     Voucher[]
+  redemptions  Redemption[]
+
+  @@index([organizationId])
+  @@map("food_bank_centers")
+}
+
+model Voucher {
+  id                 String        @id @default(cuid())
+  code               String        @unique
+  clientId           String
+  agencyId           String
+  referralDetailsId  String
+  foodBankCenterId   String?
+  organizationId     String
+  issueDate          DateTime
+  expiryDate         DateTime
+  status             VoucherStatus @default(issued)
+  issuedById         String
+  collectionNotes    String?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client           Client         @relation(fields: [clientId], references: [id], onDelete: Restrict)
+  agency           Agency         @relation(fields: [agencyId], references: [id], onDelete: Restrict)
+  referralDetails  ReferralDetails @relation(fields: [referralDetailsId], references: [id], onDelete: Restrict)
+  foodBankCenter   FoodBankCenter? @relation(fields: [foodBankCenterId], references: [id], onDelete: SetNull)
+  issuedBy         User           @relation("IssuedBy", fields: [issuedById], references: [id], onDelete: Restrict)
+  redemptions      Redemption[]
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([agencyId])
+  @@index([status])
+  @@index([issueDate])
+  @@index([code])
+  @@map("vouchers")
+}
+
+model Redemption {
+  id            String   @id @default(cuid())
+  voucherId     String
+  redeemedAt    DateTime @default(now())
+  redeemedById  String
+  centerId      String
+  failureReason String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  voucher     Voucher         @relation(fields: [voucherId], references: [id], onDelete: Restrict)
+  redeemedBy  User            @relation(fields: [redeemedById], references: [id], onDelete: Restrict)
+  center      FoodBankCenter  @relation(fields: [centerId], references: [id], onDelete: Restrict)
+
+  @@index([voucherId])
+  @@index([redeemedById])
+  @@index([redeemedAt])
+  @@map("redemptions")
+}
+
+model AuditLog {
+  id             String       @id @default(cuid())
+  userId         String?
+  organizationId String?
+  action         AuditAction
+  entity         String
+  entityId       String
+  changes        Json?
+  createdAt      DateTime     @default(now())
+
+  user         User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([entity, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes branding-gate-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@layer base {
+  :root {
+    /* Brand green (Trussell Trust–style food bank) */
+    --primary: 142 52% 32%;
+    --primary-foreground: 0 0% 100%;
+    --ring: 142 52% 32%;
+    --input: 0 0% 89%;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 9%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 9%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 0 0% 96%;
+    --accent-foreground: 0 0% 9%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --secondary: 0 0% 96%;
+  }
+}
+
+/* Print: only show .voucher-print-only content; keep it off-screen when not printing */
+.voucher-print-only {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  z-index: -1;
+}
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .voucher-print-only,
+  .voucher-print-only * {
+    visibility: visible;
+  }
+  .voucher-print-only {
+    position: absolute;
+    left: 0;
+    top: 0;
+    z-index: 0;
+    width: 100%;
+    min-height: 100vh;
+    background: white;
+    padding: 1.5rem;
+  }
+}
