@@ -11,6 +11,7 @@ import { getErrorMessage } from "@/lib/utils";
 import type { BillingResponse, PublicPlanItem } from "@/lib/types";
 import { Loading } from "@/components/ui/loading";
 import { Banknote, ExternalLink, AlertCircle } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 const STATUS_LABELS: Record<string, string> = {
   none: "No subscription",
@@ -40,7 +41,7 @@ function formatPrice(monthly: number | null, yearly: number | null): string {
 export default function BillingPage() {
   const { hasPermission, isLoading: rbacLoading } = useRbac();
   const canView = hasPermission(Permission.SETTINGS_READ);
-
+  const router = useRouter();
   const [billing, setBilling] = useState<BillingResponse | null>(null);
   const [plans, setPlans] = useState<PublicPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,8 +50,13 @@ export default function BillingPage() {
   const [portalError, setPortalError] = useState<string | null>(null);
   const [subscribePlanId, setSubscribePlanId] = useState<string | null>(null);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
-
+  // const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
+  const isBiilingActive =  process.env.SUBSCRIPTION_ENABLED === "true";
   useEffect(() => {
+    if (isBiilingActive) {
+      router.push("/dashboard");
+      return;
+    }
     if (canView) {
       Promise.all([api.billing.get(), api.plans.list().catch(() => [])])
         .then(([b, p]) => {
@@ -60,7 +66,7 @@ export default function BillingPage() {
         .catch((err) => setError(getErrorMessage(err)))
         .finally(() => setLoading(false));
     }
-  }, [canView]);
+  }, [canView, isBiilingActive, router]);
 
   async function openPortal() {
     setPortalError(null);
