@@ -31,7 +31,7 @@ import { cn } from "@/lib/utils";
 import { LoadingSkeleton } from "@/components/ui/loading";
 
 const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
-
+const isSubscriptionEnabled = process.env.SUBSCRIPTION_ENABLED === "true"   
 const NAV_ITEMS: {
   href: string;
   label: string;
@@ -48,8 +48,8 @@ const NAV_ITEMS: {
   { href: "/dashboard/centers", label: "Food bank centres", permission: Permission.USER_MANAGE, icon: MapPin },
   { href: "/dashboard/users", label: "Users", permission: Permission.USER_MANAGE, icon: UserCog },
   { href: "/dashboard/reports", label: "Reports", permission: Permission.REPORTS_READ, icon: BarChart3 },
-  { href: "/dashboard/billing", label: "Billing", permission: Permission.SETTINGS_READ, icon: Banknote },
-  { href: "/dashboard/settings", label: "Settings", permission: Permission.SETTINGS_READ, icon: Settings, hidden: onSingleTenantMode },
+  { href: "/dashboard/billing", label: "Billing", permission: Permission.SETTINGS_READ, icon: Banknote, hidden: !isSubscriptionEnabled  },
+  { href: "/dashboard/settings", label: "Settings", permission: Permission.SETTINGS_READ, icon: Settings},
   { href: "/dashboard/platform/organizations", label: "Organizations", permission: Permission.ORGANIZATION_VIEW, icon: Briefcase },
   { href: "/dashboard/platform/invitations", label: "Invitations", permission: Permission.ORGANIZATION_VIEW, icon: Globe },
   { href: "/dashboard/platform/plans", label: "Subscription Plans", permission: Permission.ORGANIZATION_VIEW, icon: CreditCard },
@@ -73,10 +73,10 @@ function NavItems({
         if (!hasPermission(item.permission)) return false;
         // Billing is for organizations only; hide for platform admins (no org)
         if (item.href === "/dashboard/billing" && user?.organizationId == null) return false;
-        if (item.hidden && onSingleTenantMode) return false;
+        if (item.hidden) return false;
         return true;
       }),
-    [hasPermission, user?.organizationId, onSingleTenantMode]
+    [hasPermission, user?.organizationId, isSubscriptionEnabled]
   );
 
   if (isLoading) {

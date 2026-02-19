@@ -34,6 +34,48 @@ async function main() {
     },
   });
 
+  await prisma.subscriptionPlan.upsert({
+    where: { slug: "growth" },
+    update: {
+      description: "For growing teams that need more capacity and support.",
+      features: ["Up to 15 users", "Voucher issuance & redemption", "Client management", "Multiple agencies & centres", "Reports & analytics", "Priority email support"],
+      priceMonthly: 20,
+      priceYearly: 120,
+    },
+    create: {
+      name: "Growth",
+      slug: "growth",
+      tier: "growth",
+      description: "For growing teams that need more capacity and support.",
+      features: ["Up to 15 users", "Voucher issuance & redemption", "Client management", "Multiple agencies & centres", "Reports & analytics", "Priority email support"],
+      limits: { maxUsers: 15, maxAgencies: 10, maxVouchersPerMonth: 500 },
+      priceMonthly: 20,
+      priceYearly: 120,
+      active: true,
+    },
+  });
+
+  await prisma.subscriptionPlan.upsert({
+    where: { slug: "enterprise" },
+    update: {
+      description: "For large organisations with custom needs. Contact us for pricing and features.",
+      features: ["Unlimited users", "Unlimited agencies & centres", "Unlimited vouchers", "Dedicated support", "Custom integrations", "SLA"],
+      priceMonthly: null,
+      priceYearly: null,
+    },
+    create: {
+      name: "Enterprise",
+      slug: "enterprise",
+      tier: "enterprise",
+      description: "For large organisations with custom needs. Contact us for pricing and features.",
+      features: ["Unlimited users", "Unlimited agencies & centres", "Unlimited vouchers", "Dedicated support", "Custom integrations", "SLA"],
+      limits: {},
+      priceMonthly: null,
+      priceYearly: null,
+      active: true,
+    },
+  });
+
   const defaultOrg = await prisma.organization.upsert({
     where: { slug: "default" },
     update: {},
