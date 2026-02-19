@@ -145,4 +145,27 @@ export function isPlatformDomain(request: Request): boolean {
   }
 }
 
+/**
+ * Same as isPlatformDomain but for server components that only have headers (and optional ?tenant=).
+ * Returns true when on platform domain (no tenant), false when on a tenant domain.
+ */
+export function isPlatformDomainFromHeaders(
+  headers: Headers,
+  tenantQuery?: string | null
+): boolean {
+  const forwarded = headers.get("x-forwarded-host");
+  const hostHeader = forwarded || headers.get("host");
+  let host = "localhost";
+  if (hostHeader) {
+    const h = hostHeader.split(",")[0].trim().split(":")[0].trim().toLowerCase();
+    if (h) host = h;
+  }
+  const subdomain = getSubdomainFromHost(host);
+  if ((host === "localhost" || host.startsWith("127.")) && subdomain == null) {
+    const q = tenantQuery ?? null;
+    if (q && /^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/.test(q) && !RESERVED_SUBDOMAINS.has(q)) return false;
+  }
+  return subdomain == null || RESERVED_SUBDOMAINS.has(subdomain);
+}
+
 export { getTenantBaseUrl, getTenantLoginUrl } from "./tenant-urls";

@@ -90,3 +90,26 @@ Configure HTTPS and any extra headers (CSP, HSTS) at the reverse proxy or platfo
 - [ ] Session cookie: secure in production (handled when `NODE_ENV=production`)
 - [ ] Multi-tenant: `APP_DOMAIN` set to your main domain (e.g. `supporthubs.org`) for production subdomains
 - [ ] Stripe (if used): webhook endpoint URL and `STRIPE_WEBHOOK_SECRET` set in Dashboard; `STRIPE_SECRET_KEY` in env
+
+## Vercel + wildcard subdomains (multi-tenant)
+
+If you deploy on Vercel with a root domain and wildcard subdomains (e.g. `supporthubs.org` and `*.supporthubs.org`):
+
+1. **Domains in Vercel**  
+   In **Project → Settings → Domains**, add:
+   - `supporthubs.org`
+   - `*.supporthubs.org`  
+   With DNS managed by Vercel, the wildcard A/CNAME is usually created for you.
+
+2. **Environment variables (required for tenant branding)**  
+   In **Project → Settings → Environment Variables**, set for Production (and Preview if you want tenant behaviour there):
+   - `APP_DOMAIN=supporthubs.org`  
+     Used by `lib/tenant.ts` to parse the subdomain from the request host (e.g. `abc.supporthubs.org` → `abc`). If this is unset, it defaults to `localhost`, so production subdomains are not recognised and you see platform branding on every subdomain.
+   - `NEXT_PUBLIC_APP_DOMAIN=supporthubs.org`  
+     Optional; used by client-side tenant URL helpers (e.g. login redirects).
+
+3. **No middleware or URL rewrite needed**  
+   The app does **not** use a `[tenant]` segment in the path. Tenant is resolved from the **Host** header in API routes (e.g. `/api/tenant/branding` via `getTenantFromRequest`). The browser request to `abc.supporthubs.org/api/tenant/branding` already sends `Host: abc.supporthubs.org`; the server only needs `APP_DOMAIN` to parse `abc` and look up the organization. No cookie or middleware rewrite is required.
+
+4. **Reserved subdomains**  
+   Subdomains `www`, `app`, `api`, `admin`, `platform`, `mail` are treated as platform (default branding), not tenants.

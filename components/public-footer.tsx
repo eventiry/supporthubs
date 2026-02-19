@@ -22,7 +22,10 @@ export function PublicFooter() {
   const { showLogo, showName, displayName } = getBrandingDisplay(branding);
   const logoUrl = branding?.logoUrl?.trim();
   const hasBrandColor = !!branding?.primaryColor;
-
+  const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
+  if (onSingleTenantMode) {
+    return null;
+  }
   return (
     <footer
       className={cn(

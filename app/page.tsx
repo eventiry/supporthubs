@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
 import Image from "next/image";
 import Link from "next/link";
-// import { redirect } from "next/navigation";
-// import { getSession } from "@/lib/auth";
+import { headers } from "next/headers";
 import { Button } from "@/components/button";
 import { PublicNav } from "@/components/public-nav";
 import { PublicFooter } from "@/components/public-footer";
+import { redirect } from "next/navigation";
+import { isPlatformDomainFromHeaders } from "@/lib/tenant";
 
 export const metadata: Metadata = {
   title: "Home",
@@ -17,11 +18,23 @@ const HERO_IMAGE =
 const SUPPORT_IMAGE =
   "https://images.unsplash.com/photo-1488521787991-ed7bbaae773c?auto=format&fit=crop&w=600&q=80";
 
-export default async function HomePage() {
-  // const session = await getSession();
-  // if (session) {
-  //   redirect("/dashboard");
-  // }
+export default async function HomePage({
+  searchParams,
+}: {
+  searchParams: Promise<{ tenant?: string }>;
+}) {
+  const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
+  if (onSingleTenantMode) {
+    return redirect("/dashboard");
+  }
+
+  const headersList = await headers();
+  const params = await searchParams;
+  const onPlatformDomain = isPlatformDomainFromHeaders(headersList, params.tenant);
+  if (!onPlatformDomain) {
+    redirect("/dashboard");
+  }
+
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col bg-background">
       <PublicNav />

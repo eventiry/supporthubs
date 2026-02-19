@@ -21,11 +21,14 @@ export function PublicNav() {
   const logoUrl = branding?.logoUrl?.trim();
   const hasBrandColor = !!branding?.primaryColor;
   const [open, setOpen] = useState(false);
-
+const  onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
   const linkClass = hasBrandColor
     ? "text-primary-foreground/90 hover:text-primary-foreground hover:bg-white/10"
     : "text-foreground hover:text-primary";
 
+  if (onSingleTenantMode) {
+    return null;
+  }
   return (
     <nav
       className={cn(

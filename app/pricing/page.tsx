@@ -44,8 +44,13 @@ export default function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
+  const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
 
   useEffect(() => {
+    if (onSingleTenantMode) {
+      router.replace("/dashboard");
+      return;
+    }
     api.plans
       .list()
       .then(setPlans)
@@ -53,7 +58,15 @@ export default function PricingPage() {
         setPlans([]);
         setError("Unable to load plans.");
       });
-  }, []);
+  }, [onSingleTenantMode, router]);
+
+  if (onSingleTenantMode) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <Loading />
+      </div>
+    );
+  }
 
   async function handleSubscribe(planId: string) {
     setSubscribeError(null);

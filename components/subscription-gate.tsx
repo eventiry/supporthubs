@@ -21,10 +21,11 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const [billingLoading, setBillingLoading] = useState(false);
 
   const isBillingPage = pathname === "/dashboard/billing" || pathname?.startsWith("/dashboard/billing");
+  const isSettingsPage = pathname === "/dashboard/settings" || pathname?.startsWith("/dashboard/settings");
   const isTenantUser = user?.organizationId != null && user.organizationId !== "";
 
   useEffect(() => {
-    if (sessionLoading || !user || !isTenantUser || isBillingPage) {
+    if (sessionLoading || !user || !isTenantUser || isBillingPage || isSettingsPage) {
       return;
     }
     setBillingLoading(true);
@@ -33,7 +34,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
       .then(setBilling)
       .catch(() => setBilling(null))
       .finally(() => setBillingLoading(false));
-  }, [sessionLoading, user, isTenantUser, isBillingPage]);
+  }, [sessionLoading, user, isTenantUser, isBillingPage, isSettingsPage]);
 
   if (sessionLoading || !user) {
     return <>{children}</>;
@@ -41,7 +42,7 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   if (!isTenantUser) {
     return <>{children}</>;
   }
-  if (isBillingPage) {
+  if (isBillingPage || isSettingsPage) {
     return <>{children}</>;
   }
   if (billingLoading) {
