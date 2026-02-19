@@ -53,11 +53,13 @@ export async function GET(req: NextRequest) {
       ...(firstName && {
         firstName: { contains: firstName, mode: "insensitive" },
       }),
-      ...(noFixedAddress === true
-        ? { noFixedAddress: true }
-        : postcode
-          ? { postcode: { contains: postcode, mode: "insensitive" } }
-          : {}),
+      // ...(noFixedAddress === true
+      //   ? { noFixedAddress: true }
+      //   : postcode
+      //     ? { postcode: { contains: postcode, mode: "insensitive" } }
+      //     : {}),
+      ...(postcode && { postcode: { contains: postcode, mode: "insensitive" } }),
+      // ...(noFixedAddress === true && { noFixedAddress: true }),
     },
     orderBy: [{ surname: "asc" }, { firstName: "asc" }],
   });

@@ -3,11 +3,22 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, LogOut } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/contexts/session-context";
 import { useBranding, getBrandingDisplay } from "@/lib/contexts/branding-context";
 import { Button } from "@/components/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/alert-dialog";
 import { Sidebar } from "./sidebar";
 import { cn } from "@/lib/utils";
 import { SIDEBAR_COLLAPSED_KEY } from "./sidebar";
@@ -47,9 +58,9 @@ export function Header() {
   }, []);
 
   async function handleLogout() {
-    await api.auth.logout();
-    router.push("/login");
-    router.refresh();
+      await api.auth.logout();
+      router.push("/login");
+      router.refresh();
   }
 
   function closeMobileMenu() {
@@ -99,14 +110,23 @@ export function Header() {
               <span className="hidden max-w-[120px] truncate text-sm text-primary-foreground sm:max-w-[180px] sm:inline">
                Hello {user.firstName}
               </span>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleLogout}
-                className="text-sm p-0 h-auto shrink-0"
-              >
-                Log out
-              </Button>
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="secondary" className="text-sm p-0 h-auto shrink-0">
+                    Log out
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Log out</AlertDialogTitle>
+                    <AlertDialogDescription>Are you sure you want to log out?</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleLogout}>Log out</AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
             </>
           )}
         </div>

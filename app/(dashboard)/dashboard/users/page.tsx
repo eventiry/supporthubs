@@ -22,6 +22,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
@@ -30,6 +31,7 @@ import { Loading } from "@/components/ui/loading";
 export default function UsersPage() {
   const { hasPermission, isLoading: rbacLoading } = useRbac();
   const canManage = hasPermission(Permission.USER_MANAGE);
+  const canManageAgenciesAndCenters = hasPermission(Permission.USER_MANAGE);
 
   const [users, setUsers] = useState<UserListItem[]>([]);
   const [agencies, setAgencies] = useState<Agency[]>([]);
@@ -47,9 +49,16 @@ export default function UsersPage() {
   const [createFirstName, setCreateFirstName] = useState("");
   const [createLastName, setCreateLastName] = useState("");
   const [createRole, setCreateRole] = useState<"admin" | "third_party" | "back_office">("back_office");
-  const [createAgencyId, setCreateAgencyId] = useState("");
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const [agencyId, setAgencyId] = useState("");
+  const [addAgencyDialogOpen, setAddAgencyDialogOpen] = useState(false);
+  const [addAgencyName, setAddAgencyName] = useState("");
+  const [addAgencyPhone, setAddAgencyPhone] = useState("");
+  const [addAgencyEmail, setAddAgencyEmail] = useState("");
+  const [addAgencyLoading, setAddAgencyLoading] = useState(false);
+  const [addAgencyError, setAddAgencyError] = useState<string | null>(null);
 
   const userDialogOpen = showCreate || !!editUser;
   const [searchQuery, setSearchQuery] = useState("");
@@ -89,12 +98,12 @@ export default function UsersPage() {
       setCreateError("Email, password, first name and last name are required.");
       return;
     }
-    if (createRole === "third_party" && !createAgencyId) {
+    if (createRole === "third_party" && !agencyId) {
       setCreateError("Agency is required for third-party users.");
       return;
     }
-    if (createRole === "back_office" && createAgencyId) {
-      setCreateAgencyId("")
+    if (createRole === "back_office" && agencyId) {
+      setAgencyId("")
     }
     setCreateLoading(true);
     try {
@@ -104,7 +113,7 @@ export default function UsersPage() {
         firstName: createFirstName.trim(),
         lastName: createLastName.trim(),
         role: createRole,
-        agencyId: createAgencyId || undefined,
+        agencyId: agencyId || undefined,
       });
       api.users.list({ role: (roleFilter || undefined) as UserRole | undefined, agencyId: agencyFilter || undefined }).then(setUsers);
       setShowCreate(false);
@@ -113,11 +122,40 @@ export default function UsersPage() {
       setCreateFirstName("");
       setCreateLastName("");
       setCreateRole("back_office");
-      setCreateAgencyId("");
+      setAgencyId("");
     } catch (err) {
       setCreateError(getErrorMessage(err));
     } finally {
       setCreateLoading(false);
+    }
+  }
+
+  async function handleAddAgency(e: React.FormEvent) {
+    e.preventDefault();
+    setAddAgencyError(null);
+    const name = addAgencyName.trim();
+    if (!name) {
+      setAddAgencyError("Agency name is required.");
+      return;
+    }
+    setAddAgencyLoading(true);
+    try {
+      const agency = await api.agencies.create({
+        name,
+        contactPhone: addAgencyPhone.trim() || undefined,
+        contactEmail: addAgencyEmail.trim() || undefined,
+      });
+      const list = await api.agencies.list();
+      setAgencies(list);
+      setAgencyId(agency.id);
+      setAddAgencyDialogOpen(false);
+      setAddAgencyName("");
+      setAddAgencyPhone("");
+      setAddAgencyEmail("");
+    } catch (err) {
+      setAddAgencyError(getErrorMessage(err));
+    } finally {
+      setAddAgencyLoading(false);
     }
   }
 
@@ -127,7 +165,7 @@ export default function UsersPage() {
     setCreateFirstName(u.firstName);
     setCreateLastName(u.lastName);
     setCreateRole(u.role as "admin" | "third_party" | "back_office");
-    setCreateAgencyId(u.agencyId ?? "");
+    setAgencyId(u.agencyId ?? "");
     setEditStatus(u.status);
     setEditError(null);
     setCreateError(null);
@@ -148,7 +186,7 @@ export default function UsersPage() {
       setEditError("First name and last name are required.");
       return;
     }
-    if (createRole === "third_party" && !createAgencyId) {
+    if (createRole === "third_party" && !agencyId) {
       setEditError("Agency is required for third-party users.");
       return;
     }
@@ -158,7 +196,7 @@ export default function UsersPage() {
         firstName: createFirstName.trim(),
         lastName: createLastName.trim(),
         role: createRole,
-        agencyId: createAgencyId || null,
+        agencyId: agencyId || null,
         status: editStatus,
       });
       api.users.list({ role: (roleFilter || undefined) as UserRole | undefined, agencyId: agencyFilter || undefined }).then(setUsers);
@@ -246,21 +284,34 @@ export default function UsersPage() {
                   <option value="back_office">Back office</option>
                 </select>
               </div>
+
               {createRole === "third_party" && (
                 <div className="space-y-2">
                   <Label>Agency *</Label>
-                  <select
-                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                    value={createAgencyId}
-                    onChange={(e) => setCreateAgencyId(e.target.value)}
-                    required
-                    disabled={editLoading}
-                  >
-                    <option value="">Select agency</option>
-                    {agencies.map((a) => (
-                      <option key={a.id} value={a.id}>{a.name}</option>
-                    ))}
-                  </select>
+                  <div className="flex gap-2">
+                    <select
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                      value={agencyId}
+                      onChange={(e) => setAgencyId(e.target.value)}
+                    >
+                      <option value="">Select agency</option>
+                      {agencies.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                    {canManageAgenciesAndCenters && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAddAgencyDialogOpen(true)}
+                      >
+                        Add agency
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
               <div className="space-y-2">
@@ -344,7 +395,7 @@ export default function UsersPage() {
                   <option value="back_office">Back office</option>
                 </select>
               </div>
-              {createRole === "third_party" && (
+              {/* {createRole === "third_party" && (
                 <div className="space-y-2">
                   <Label>Agency *</Label>
                   <select
@@ -367,6 +418,36 @@ export default function UsersPage() {
                       page first, then come back to create this user.
                     </p>
                   )}
+                </div>
+              )} */}
+              
+              {createRole === "third_party" && (
+                <div className="space-y-2">
+                  <Label>Agency *</Label>
+                  <div className="flex gap-2">
+                    <select
+                      className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                      value={agencyId}
+                      onChange={(e) => setAgencyId(e.target.value)}
+                    >
+                      <option value="">Select agency</option>
+                      {agencies.map((a) => (
+                        <option key={a.id} value={a.id}>
+                          {a.name}
+                        </option>
+                      ))}
+                    </select>
+                    {canManageAgenciesAndCenters && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setAddAgencyDialogOpen(true)}
+                      >
+                        Add agency
+                      </Button>
+                    )}
+                  </div>
                 </div>
               )}
               {createError && (
@@ -465,6 +546,73 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+      <Dialog open={addAgencyDialogOpen} onOpenChange={setAddAgencyDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add agency</DialogTitle>
+            <DialogDescription>
+              Create a new referral agency. It will be selected for this voucher.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleAddAgency} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="add-agency-name">Name *</Label>
+              <Input
+                id="add-agency-name"
+                value={addAgencyName}
+                onChange={(e) => setAddAgencyName(e.target.value)}
+                placeholder="e.g. Citizens Advice North"
+                required
+                disabled={addAgencyLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-agency-phone">Contact phone</Label>
+              <Input
+                id="add-agency-phone"
+                type="tel"
+                value={addAgencyPhone}
+                onChange={(e) => setAddAgencyPhone(e.target.value)}
+                placeholder="Optional"
+                disabled={addAgencyLoading}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="add-agency-email">Contact email</Label>
+              <Input
+                id="add-agency-email"
+                type="email"
+                value={addAgencyEmail}
+                onChange={(e) => setAddAgencyEmail(e.target.value)}
+                placeholder="Optional"
+                disabled={addAgencyLoading}
+              />
+            </div>
+            {addAgencyError && (
+              <p className="text-sm text-destructive" role="alert">{addAgencyError}</p>
+            )}
+            <div className="flex gap-2">
+              <Button type="submit" disabled={addAgencyLoading}>
+                {addAgencyLoading ? "Creating…" : "Create agency"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setAddAgencyDialogOpen(false);
+                  setAddAgencyError(null);
+                  setAddAgencyName("");
+                  setAddAgencyPhone("");
+                  setAddAgencyEmail("");
+                }}
+                disabled={addAgencyLoading}
+              >
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

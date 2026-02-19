@@ -397,6 +397,7 @@ export default function IssueVoucherWizardPage() {
                 <Label>Postcode</Label>
                 <Input
                   value={clientSearch.postcode}
+                  placeholder="e.g. NE6 3XH"
                   onChange={(e) =>
                     setClientSearch((s) => ({ ...s, postcode: e.target.value }))
                   }
