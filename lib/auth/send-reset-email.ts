@@ -82,7 +82,7 @@ export async function sendSetPasswordEmail(
   try {
     await sendEmail({
       to: email,
-      subject: `Set up your ${EMAIL_APP_NAME} password`,
+      subject: `Set up your ${organizationName} password`,
       react: SetPasswordEmail({
         firstName,
         setPasswordUrl,
