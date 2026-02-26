@@ -175,7 +175,7 @@ export async function DELETE(
     action: AuditAction.DELETE,
     entity: "Voucher",
     entityId: id,
-    changes: { code: voucher.code },
+    changes: { code: voucher.code, status: "DELETED" },
   });
   return NextResponse.json({ message: "Voucher deleted" });
 }

@@ -166,9 +166,8 @@ export async function DELETE(
     return NextResponse.json({ message: "User not found" }, { status: 404 });
   }
 
-  await db.user.update({
-    where: { id },
-    data: { status: "SUSPENDED" },
+  await db.user.delete({
+    where: { id, organizationId: tenant.organizationId }
   });
 
   await createAuditLog(db, {
@@ -177,7 +176,7 @@ export async function DELETE(
     action: AuditAction.DELETE,
     entity: "User",
     entityId: id,
-    changes: { status: "SUSPENDED" },
+    changes: { status: "DELETED", email: existing.email, firstName: existing.firstName, lastName: existing.lastName, role: existing.role, agencyId: existing.agencyId ?? null },
   });
 
   return new NextResponse(null, { status: 204 });
