@@ -7,6 +7,7 @@
 import { sendEmail } from "@/lib/email/send";
 import { PasswordResetEmail, SetPasswordEmail } from "@/lib/email";
 import { EMAIL_APP_NAME } from "@/lib/email/config";
+import { getTenantBaseUrl } from "@/lib/tenant-urls";
 
 const RESET_LINK_TTL_HOURS = 1;
 const SET_PASSWORD_LINK_TTL_HOURS = 24;
@@ -18,8 +19,15 @@ export function getResetLinkBaseUrl(): string {
   return "http://localhost:3000";
 }
 
-export function buildResetPasswordUrl(token: string): string {
-  const base = getResetLinkBaseUrl();
+/**
+ * Builds the reset-password (or set-password) URL. When the user belongs to an organization,
+ * uses that organization's subdomain so they land on the correct tenant; otherwise uses the main domain.
+ */
+export function buildResetPasswordUrl(token: string, organizationSlug?: string | null): string {
+  const base =
+    organizationSlug != null && organizationSlug.trim() !== ""
+      ? getTenantBaseUrl(organizationSlug.trim())
+      : getResetLinkBaseUrl();
   return `${base}/reset-password?token=${encodeURIComponent(token)}`;
 }
 
@@ -40,7 +48,7 @@ export async function sendPasswordResetEmail(
   try {
     await sendEmail({
       to: email,
-      subject: `Reset your ${EMAIL_APP_NAME} password`,
+      subject: `Reset your ${organizationName ?? EMAIL_APP_NAME} password`,
       react: PasswordResetEmail({
         firstName: firstName ?? "there",
         resetUrl,
@@ -75,14 +83,15 @@ export async function sendSetPasswordEmail(
   firstName: string,
   organizationName: string,
   roleLabel: string,
-  logoUrl?: string | null
+  logoUrl?: string | null,
+  organizationSlug?: string | null
 ): Promise<void> {
-  const setPasswordUrl = buildResetPasswordUrl(token);
+  const setPasswordUrl = buildResetPasswordUrl(token, organizationSlug);
 
   try {
     await sendEmail({
       to: email,
-      subject: `Set up your ${organizationName} password`,
+      subject: `Set up your ${organizationName ?? EMAIL_APP_NAME} password`,
       react: SetPasswordEmail({
         firstName,
         setPasswordUrl,

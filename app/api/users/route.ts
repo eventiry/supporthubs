@@ -186,14 +186,15 @@ export async function POST(req: NextRequest) {
 
   const organization = await db.organization.findUnique({
     where: { id: tenant.organizationId },
-    select: { name: true, logoUrl: true },
+    select: { name: true, logoUrl: true, slug: true },
   });
   const organizationName = organization?.name ?? "your organization";
   const logoUrl = organization?.logoUrl?.trim() || undefined;
+  const organizationSlug = organization?.slug ?? undefined;
   const roleLabel = getRoleDisplayLabel(created.role);
 
   try {
-    await sendSetPasswordEmail(created.email, setPasswordToken, created.firstName, organizationName, roleLabel, logoUrl);
+    await sendSetPasswordEmail(created.email, setPasswordToken, created.firstName, organizationName, roleLabel, logoUrl, organizationSlug);
   } catch (err) {
     if (process.env.NODE_ENV !== "production") {
       // In development, link may be logged by sendSetPasswordEmail; continue without failing the request.

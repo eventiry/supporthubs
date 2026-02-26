@@ -35,7 +35,7 @@ export async function POST(request: Request) {
         status: true,
         firstName: true,
         organizationId: true,
-        organization: { select: { name: true, logoUrl: true } },
+        organization: { select: { name: true, logoUrl: true, slug: true } },
       },
     });
 
@@ -55,7 +55,8 @@ export async function POST(request: Request) {
 
       const organizationName = user.organization?.name ?? undefined;
       const logoUrl = user.organization?.logoUrl ?? undefined;
-      await sendPasswordResetEmail(email, token, user.firstName, organizationName, logoUrl);
+      const organizationSlug = user.organization?.slug ?? undefined;
+      await sendPasswordResetEmail(email, token, user.firstName, organizationName, logoUrl, organizationSlug);
     }
     // Same response whether or not account exists
     return NextResponse.json({
