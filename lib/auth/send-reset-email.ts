@@ -41,9 +41,10 @@ export async function sendPasswordResetEmail(
   token: string,
   firstName?: string,
   organizationName?: string | null,
-  logoUrl?: string | null
+  logoUrl?: string | null,
+  organizationSlug?: string | null
 ): Promise<void> {
-  const resetUrl = buildResetPasswordUrl(token);
+  const resetUrl = buildResetPasswordUrl(token, organizationSlug);
 
   try {
     await sendEmail({
