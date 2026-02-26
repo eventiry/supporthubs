@@ -5,7 +5,6 @@ import { Button } from "./button"
 import { Textarea } from "./textarea"
 import { Avatar, AvatarImage, AvatarFallback } from "./avatar"
 import { ScrollArea } from "./scroll-area"
-import { Badge } from "./badge"
 import { useApiError } from "./use-api-error"
 import { FileViewer } from "./file-viewer"
 import { Send, Check, CheckCheck, Paperclip, X, Image as ImageIcon, File } from "lucide-react"
@@ -47,7 +46,7 @@ export function ServiceMessages({
   const [messages, setMessages] = useState<ServiceBookingMessage[]>(initialMessages)
   const [messageText, setMessageText] = useState("")
   const [sending, setSending] = useState(false)
-  const [loading, setLoading] = useState(false)
+  const [_loading, _setLoading] = useState(false)
   const [attachments, setAttachments] = useState<AttachmentPreview[]>([])
   const [uploading, setUploading] = useState(false)
   const [viewingAttachments, setViewingAttachments] = useState<{ urls: string[]; index: number } | null>(null)

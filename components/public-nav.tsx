@@ -35,7 +35,7 @@ const  onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true
         "sticky top-0 z-40 w-full border-b backdrop-blur supports-[backdrop-filter]:backdrop-blur-md",
         !brandingLoading && hasBrandColor
           ? "bg-primary border-primary/20 text-primary-foreground"
-          : "bg-background/95 border-border supports-[backdrop-filter]:bg-background/80"
+          : "bg-background border-border supports-[backdrop-filter]:bg-background"
       )}
       aria-label="Main"
     >
@@ -51,14 +51,14 @@ const  onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true
             </>
           ) : (
             <>
-              {showLogo && logoUrl && (
+              {/* {showLogo && logoUrl && ( */}
                 <img
-                  src={logoUrl}
+                  src={"/logo.png"}
                   alt=""
-                  className="h-8 w-auto max-h-8 object-contain"
+                  className="h-12 w-auto max-h-12 object-contain"
                 />
-              )}
-              {showName && (
+              {/* )} */}
+              {/* {showName && (
                 <span
                   className={cn(
                     "truncate font-semibold",
@@ -67,7 +67,7 @@ const  onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true
                 >
                   {displayName}
                 </span>
-              )}
+              )} */}
             </>
           )}
         </Link>

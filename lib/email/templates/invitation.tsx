@@ -16,8 +16,11 @@ export function InvitationEmail({
   expiresInDays,
 }: InvitationEmailProps) {
   return (
-    <EmailLayout preview={`You're invited to join ${organizationName} on ${EMAIL_APP_NAME}`}>
-      <Heading style={h1}>You&apos;re invited to join {EMAIL_APP_NAME}</Heading>
+    <EmailLayout
+      preview={`You're invited to join ${organizationName} on ${EMAIL_APP_NAME}`}
+      organizationName={organizationName}
+    >
+      <Heading style={h1}>You&apos;re invited to join {organizationName}</Heading>
       <Text style={text}>
         You have been invited to set up <strong>{organizationName}</strong> on {EMAIL_APP_NAME}.
       </Text>

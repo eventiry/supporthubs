@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@prisma/client";
 import { getPermissionsForRole } from "@/lib/rbac/permissions";
 import { Permission } from "@/lib/rbac/permissions";
 import { db } from "@/lib/db";
@@ -57,21 +58,21 @@ export async function PATCH(
       postcode?: string | null;
       phone?: string | null;
       email?: string | null;
+      openingHours?: Record<string, string> | null;
       canDeliver?: boolean;
     };
-    const data: {
-      name?: string;
-      address?: string | null;
-      postcode?: string | null;
-      phone?: string | null;
-      email?: string | null;
-      canDeliver?: boolean;
-    } = {};
+    const data: Prisma.FoodBankCenterUpdateInput = {};
     if (typeof body?.name === "string") data.name = body.name.trim();
     if (body?.address !== undefined) data.address = body.address ? String(body.address).trim() || null : null;
     if (body?.postcode !== undefined) data.postcode = body.postcode ? String(body.postcode).trim() || null : null;
     if (body?.phone !== undefined) data.phone = body.phone ? String(body.phone).trim() || null : null;
     if (body?.email !== undefined) data.email = body.email ? String(body.email).trim() || null : null;
+    if (body?.openingHours !== undefined) {
+      data.openingHours =
+        body.openingHours != null && typeof body.openingHours === "object" && !Array.isArray(body.openingHours)
+          ? (body.openingHours as Prisma.InputJsonValue)
+          : Prisma.JsonNull;
+    }
     if (typeof body?.canDeliver === "boolean") data.canDeliver = body.canDeliver;
     if (data.name === "") {
       return NextResponse.json({ message: "Name cannot be empty" }, { status: 400 });

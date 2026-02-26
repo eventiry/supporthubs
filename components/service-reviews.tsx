@@ -1,13 +1,13 @@
 "use client"
 
 import { useState } from "react"
-import { Card, CardContent, CardHeader, CardTitle } from "./card"
+import { Card, CardContent, CardHeader } from "./card"
 import { Avatar, AvatarImage, AvatarFallback } from "./avatar"
 import { Badge } from "./badge"
 import { Button } from "./button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./select"
 import { Star, ChevronLeft, ChevronRight } from "lucide-react"
-import type { ServiceReview, User, PaginatedResponse } from "@ordafy/types"
+import type { ServiceReview, User } from "@ordafy/types"
 import { formatDate } from "@ordafy/utils"
 import { cn } from "./utils"
 import { FileViewer } from "./file-viewer"
@@ -27,7 +27,7 @@ export function ServiceReviews({
   reviews,
   total,
   page = 1,
-  limit = 10,
+  limit: _limit = 10,
   totalPages,
   onPageChange,
   onFilterChange,
@@ -204,7 +204,7 @@ export function ServiceReviews({
           </Card>
         ) : (
           reviews?.map((review) => {
-            const averageRating = getAverageRating(review)
+            const _averageRating = getAverageRating(review)
             return (
               <Card key={review.id}>
                 <CardHeader>

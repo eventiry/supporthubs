@@ -68,6 +68,7 @@ export function BrandingProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <BrandingContext.Provider value={value}>
+      <FaviconUpdater />
       {children}
       {!isLoading && branding && (branding.primaryColor || branding.secondaryColor) && (
         <BrandingStyles
@@ -108,6 +109,25 @@ export function BrandingGate({ children }: { children: React.ReactNode }) {
   }
 
   return <>{children}</>;
+}
+
+/** Default favicon when organization has no logo (place Support Hubs logo at public/logo.png). */
+const DEFAULT_FAVICON = "/icon.png";
+
+function FaviconUpdater() {
+  const { branding, isLoading } = useBranding();
+  useEffect(() => {
+    if (typeof document === "undefined" || isLoading) return;
+    const href = branding?.logoUrl?.trim() || DEFAULT_FAVICON;
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement("link");
+      link.rel = "icon";
+      document.head.appendChild(link);
+    }
+    if (link.href !== href) link.href = href;
+  }, [branding?.logoUrl, isLoading]);
+  return null;
 }
 
 /**
@@ -158,7 +178,7 @@ export function getBrandingDisplay(
   defaultName: string = DEFAULT_APP_NAME
 ): { showLogo: boolean; showName: boolean; displayName: string } {
   const name = branding?.name?.trim() || defaultName;
-  const logoUrl = branding?.logoUrl?.trim();
+  const logoUrl = branding?.logoUrl?.trim() || "/logo.png";
   const mode = branding?.brandingDisplay ?? "both";
 
   if (mode === "name") {

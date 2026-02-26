@@ -45,12 +45,17 @@ export async function POST(request: Request) {
       postcode?: string;
       phone?: string;
       email?: string;
+      openingHours?: Record<string, string> | null;
       canDeliver?: boolean;
     };
     const name = typeof body?.name === "string" ? body.name.trim() : "";
     if (!name) {
       return NextResponse.json({ message: "Name is required" }, { status: 400 });
     }
+    const openingHours =
+      body?.openingHours != null && typeof body.openingHours === "object" && !Array.isArray(body.openingHours)
+        ? body.openingHours
+        : undefined;
 
     const center = await db.foodBankCenter.create({
       data: {
@@ -60,6 +65,7 @@ export async function POST(request: Request) {
         postcode: typeof body?.postcode === "string" ? body.postcode.trim() || null : null,
         phone: typeof body?.phone === "string" ? body.phone.trim() || null : null,
         email: typeof body?.email === "string" ? body.email.trim() || null : null,
+        openingHours: openingHours ?? undefined,
         canDeliver: typeof body?.canDeliver === "boolean" ? body.canDeliver : false,
       },
     });

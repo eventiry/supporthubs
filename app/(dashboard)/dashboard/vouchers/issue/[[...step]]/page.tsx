@@ -8,6 +8,8 @@ import { getErrorMessage } from "@/lib/utils";
 import { formatDate } from "@/lib/utils";
 import { useRbac } from "@/lib/hooks/use-rbac";
 import { Permission } from "@/lib/rbac/permissions";
+import { useSession } from "@/lib/contexts/session-context";
+import { isOrgInSelectedOrgsClient } from "@/lib/config";
 import type {
   ClientSearchResult,
   ClientWithVouchers,
@@ -27,6 +29,7 @@ import {
   DialogDescription,
 } from "@/components/dialog";
 import { CreateClientForm } from "@/components/create-client-form";
+import { CenterForm } from "@/components/center-form";
 
 const STEPS = 6;
 const NOTES_MAX = 400;
@@ -70,6 +73,15 @@ const INCOME_SOURCE_OPTIONS = [
   "Unable to ask",
 ] as const;
 const INCOME_SOURCE_OTHER_LABEL = "Other";
+
+/** Age bands for "number of people the voucher is for (by age group)". */
+const HOUSEHOLD_AGE_BANDS = [
+  "0-17",
+  "18-24",
+  "25-44",
+  "45-64",
+  "65+",
+] as const;
 
 /** Ethnic group — single-select options (UK ONS-style categories). */
 const ETHNIC_GROUP_OPTIONS = [
@@ -132,10 +144,14 @@ function buildMultiSelectWithOther(
   return list.join(", ");
 }
 
+const NA_LABEL = "N/A";
+
 export default function IssueVoucherWizardPage() {
   const searchParams = useSearchParams();
   const clientIdParam = searchParams.get("clientId");
   const { hasPermission } = useRbac();
+  const { user } = useSession();
+  const selectedOrgsRules = isOrgInSelectedOrgsClient(user?.organizationId ?? null);
   const canManageAgenciesAndCenters = hasPermission(Permission.USER_MANAGE);
 
   const [step, setStep] = useState(1);
@@ -150,6 +166,8 @@ export default function IssueVoucherWizardPage() {
     notes: "",
     contactConsent: false,
     dietaryConsent: false,
+    incomeSource: undefined,
+    dietaryRequirements: undefined,
   });
   const [agencyId, setAgencyId] = useState("");
   const [foodBankCenterId, setFoodBankCenterId] = useState("");
@@ -170,12 +188,6 @@ export default function IssueVoucherWizardPage() {
   const [addAgencyEmail, setAddAgencyEmail] = useState("");
   const [addAgencyLoading, setAddAgencyLoading] = useState(false);
   const [addAgencyError, setAddAgencyError] = useState<string | null>(null);
-  const [addCenterName, setAddCenterName] = useState("");
-  const [addCenterAddress, setAddCenterAddress] = useState("");
-  const [addCenterPostcode, setAddCenterPostcode] = useState("");
-  const [addCenterPhone, setAddCenterPhone] = useState("");
-  const [addCenterEmail, setAddCenterEmail] = useState("");
-  const [addCenterCanDeliver, setAddCenterCanDeliver] = useState(false);
   const [addCenterLoading, setAddCenterLoading] = useState(false);
   const [addCenterError, setAddCenterError] = useState<string | null>(null);
 
@@ -196,9 +208,25 @@ export default function IssueVoucherWizardPage() {
     api.centers.list().then(setCenters).catch(() => {});
   }, []);
 
+  const isThirdPartyAgency = user?.role === "third_party" && !!user?.agencyId;
+  const agenciesToShow = isThirdPartyAgency && user?.agencyId
+    ? agencies.filter((a) => a.id === user.agencyId)
+    : agencies;
+
   useEffect(() => {
     if (agencies.length === 1) setAgencyId(agencies[0]!.id);
   }, [agencies]);
+  useEffect(() => {
+    if (isThirdPartyAgency && user?.agencyId && agencies.some((a) => a.id === user.agencyId)) {
+      setAgencyId(user.agencyId);
+    }
+  }, [isThirdPartyAgency, user?.agencyId, agencies]);
+
+  useEffect(() => {
+    if (selectedOrgsRules && centers.length >= 1) {
+      setFoodBankCenterId(centers[0]!.id);
+    }
+  }, [selectedOrgsRules, centers]);
 
   const [datesInitialized, setDatesInitialized] = useState(false);
   useEffect(() => {
@@ -250,15 +278,12 @@ export default function IssueVoucherWizardPage() {
 
   function canProceedFromStep(s: number): boolean {
     if (s === 2) return !!selectedClient;
-    if (s === 3)
-      return (
-        referral.notes.trim().length > 0 &&
-        referral.notes.length <= NOTES_MAX &&
-        referral.contactConsent &&
-        referral.dietaryConsent &&
-        (vouchersInLast6Months < 3 || (referral.moreThan3VouchersReason ?? "").trim().length > 0)
-      );
-    if (s === 4) return !!agencyId && !!issueDate && !!expiryDate;
+    if (s === 3) {
+      const notesOk = referral.notes.length <= NOTES_MAX;
+      const consentOk = selectedOrgsRules ? true : referral.contactConsent && referral.dietaryConsent;
+      return notesOk && consentOk && (vouchersInLast6Months < 3 || (referral.moreThan3VouchersReason ?? "").trim().length > 0);
+    }
+    if (s === 4) return !!agencyId && !!issueDate && (selectedOrgsRules || !!expiryDate);
     if (s === 5) return !!foodBankCenterId;
     return true;
   }
@@ -292,34 +317,33 @@ export default function IssueVoucherWizardPage() {
     }
   }
 
-  async function handleAddCenter(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleAddCenter(values: {
+    name: string;
+    address: string;
+    postcode: string;
+    phone: string;
+    email: string;
+    canDeliver: boolean;
+    openingHours: Record<string, string>;
+  }) {
     setAddCenterError(null);
-    const name = addCenterName.trim();
-    if (!name) {
-      setAddCenterError("Centre name is required.");
-      return;
-    }
     setAddCenterLoading(true);
     try {
+      const openingHours =
+        values.openingHours && Object.keys(values.openingHours).length > 0 ? values.openingHours : undefined;
       const center = await api.centers.create({
-        name,
-        address: addCenterAddress.trim() || undefined,
-        postcode: addCenterPostcode.trim() || undefined,
-        phone: addCenterPhone.trim() || undefined,
-        email: addCenterEmail.trim() || undefined,
-        canDeliver: addCenterCanDeliver,
+        name: values.name,
+        address: values.address || undefined,
+        postcode: values.postcode || undefined,
+        phone: values.phone || undefined,
+        email: values.email || undefined,
+        openingHours: openingHours ?? undefined,
+        canDeliver: values.canDeliver,
       });
       const list = await api.centers.list();
       setCenters(list);
       setFoodBankCenterId(center.id);
       setAddCenterDialogOpen(false);
-      setAddCenterName("");
-      setAddCenterAddress("");
-      setAddCenterPostcode("");
-      setAddCenterPhone("");
-      setAddCenterEmail("");
-      setAddCenterCanDeliver(false);
     } catch (err) {
       setAddCenterError(getErrorMessage(err));
     } finally {
@@ -331,6 +355,20 @@ export default function IssueVoucherWizardPage() {
     if (!selectedClient || !agencyId) return;
     setSubmitError(null);
     setSubmitLoading(true);
+    const issueDateIso = new Date(issueDate).toISOString().slice(0, 10);
+    const expiryForPayload = selectedOrgsRules
+      ? (() => {
+          const d = new Date(issueDate);
+          d.setDate(d.getDate() + 7);
+          return d.toISOString().slice(0, 10);
+        })()
+      : new Date(expiryDate).toISOString().slice(0, 10);
+    const incomeForPayload = selectedOrgsRules
+      ? (referral.incomeSource?.trim() === "" || !referral.incomeSource ? NA_LABEL : referral.incomeSource)
+      : referral.incomeSource;
+    const dietaryForPayload = selectedOrgsRules
+      ? (referral.dietaryRequirements?.trim() === "" || !referral.dietaryRequirements ? NA_LABEL : referral.dietaryRequirements)
+      : referral.dietaryRequirements;
     try {
       const v = await api.vouchers.create({
         clientId: selectedClient.id,
@@ -339,11 +377,13 @@ export default function IssueVoucherWizardPage() {
           ...referral,
           notes: referral.notes.slice(0, NOTES_MAX),
           parcelNotes: referral.parcelNotes?.slice(0, PARCEL_NOTES_MAX),
+          incomeSource: incomeForPayload,
+          dietaryRequirements: dietaryForPayload,
         },
-        issueDate: new Date(issueDate).toISOString().slice(0, 10),
-        expiryDate: new Date(expiryDate).toISOString().slice(0, 10),
+        issueDate: issueDateIso,
+        expiryDate: expiryForPayload,
         foodBankCenterId: foodBankCenterId || undefined,
-        collectionNotes: collectionNotes.trim() || undefined,
+        collectionNotes: selectedOrgsRules ? undefined : (collectionNotes.trim() || undefined),
       });
       setCreatedVoucherId(v.id);
       setCreatedCode(v.code);
@@ -579,7 +619,13 @@ export default function IssueVoucherWizardPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={addCenterDialogOpen} onOpenChange={setAddCenterDialogOpen}>
+      <Dialog
+        open={addCenterDialogOpen}
+        onOpenChange={(open) => {
+          setAddCenterDialogOpen(open);
+          if (!open) setAddCenterError(null);
+        }}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Add centre</DialogTitle>
@@ -587,99 +633,17 @@ export default function IssueVoucherWizardPage() {
               Create a new food bank centre. It will be selected for this voucher.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleAddCenter} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="add-center-name">Name *</Label>
-              <Input
-                id="add-center-name"
-                value={addCenterName}
-                onChange={(e) => setAddCenterName(e.target.value)}
-                placeholder="e.g. North East Food Bank"
-                required
-                disabled={addCenterLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-center-address">Address</Label>
-              <Input
-                id="add-center-address"
-                value={addCenterAddress}
-                onChange={(e) => setAddCenterAddress(e.target.value)}
-                placeholder="Optional"
-                disabled={addCenterLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-center-postcode">Postcode</Label>
-              <Input
-                id="add-center-postcode"
-                value={addCenterPostcode}
-                onChange={(e) => setAddCenterPostcode(e.target.value)}
-                placeholder="Optional"
-                disabled={addCenterLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-center-phone">Phone</Label>
-              <Input
-                id="add-center-phone"
-                type="tel"
-                value={addCenterPhone}
-                onChange={(e) => setAddCenterPhone(e.target.value)}
-                placeholder="Optional"
-                disabled={addCenterLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="add-center-email">Email</Label>
-              <Input
-                id="add-center-email"
-                type="email"
-                value={addCenterEmail}
-                onChange={(e) => setAddCenterEmail(e.target.value)}
-                placeholder="Optional"
-                disabled={addCenterLoading}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="add-center-canDeliver"
-                checked={addCenterCanDeliver}
-                onChange={(e) => setAddCenterCanDeliver(e.target.checked)}
-                className="h-4 w-4 rounded border-input"
-                disabled={addCenterLoading}
-              />
-              <Label htmlFor="add-center-canDeliver" className="cursor-pointer">
-                Can deliver
-              </Label>
-            </div>
-            {addCenterError && (
-              <p className="text-sm text-destructive" role="alert">{addCenterError}</p>
-            )}
-            <div className="flex gap-2">
-              <Button type="submit" disabled={addCenterLoading}>
-                {addCenterLoading ? "Creating…" : "Create centre"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setAddCenterDialogOpen(false);
-                  setAddCenterError(null);
-                  setAddCenterName("");
-                  setAddCenterAddress("");
-                  setAddCenterPostcode("");
-                  setAddCenterPhone("");
-                  setAddCenterEmail("");
-                  setAddCenterCanDeliver(false);
-                }}
-                disabled={addCenterLoading}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+          <CenterForm
+            onSubmit={handleAddCenter}
+            onCancel={() => {
+              setAddCenterDialogOpen(false);
+              setAddCenterError(null);
+            }}
+            submitLabel="Create centre"
+            loading={addCenterLoading}
+            error={addCenterError}
+            idPrefix="add-center"
+          />
         </DialogContent>
       </Dialog>
 
@@ -729,7 +693,7 @@ export default function IssueVoucherWizardPage() {
           [...DIETARY_OPTIONS],
           DIETARY_OTHER_LABEL
         );
-        const incomeSource = referral.incomeSource ?? "";
+        const incomeSource = referral.incomeSource ?? (selectedOrgsRules ? NA_LABEL : "");
         const isIncomeOther =
           incomeSource === INCOME_SOURCE_OTHER_LABEL ||
           incomeSource.startsWith(INCOME_SOURCE_OTHER_LABEL + ":") ||
@@ -750,24 +714,23 @@ export default function IssueVoucherWizardPage() {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Notes (max {NOTES_MAX} characters) *</Label>
-                <textarea
-                  className="min-h-[100px] w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                  value={referral.notes}
-                  onChange={(e) =>
-                    setReferral((r) => ({ ...r, notes: e.target.value }))
-                  }
-                  maxLength={NOTES_MAX}
-                  placeholder="Please enter any additional information that may be relevant to the food bank when providing support."
-                />
-                <p className="text-xs text-muted-foreground">
-                  {referral.notes.length} / {NOTES_MAX}
-                </p>
-              </div>
-
-              <div className="space-y-2">
                 <Label>Source of income in the household (optional)</Label>
                 <div className="space-y-2">
+                  {selectedOrgsRules && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="incomeSource"
+                        id="income-NA"
+                        checked={(incomeSource === "" || incomeSource === NA_LABEL || !incomeSource)}
+                        onChange={() =>
+                          setReferral((r) => ({ ...r, incomeSource: NA_LABEL }))
+                        }
+                        className="h-4 w-4 rounded-full border-input"
+                      />
+                      <Label htmlFor="income-NA" className="font-normal cursor-pointer">{NA_LABEL}</Label>
+                    </div>
+                  )}
                   {INCOME_SOURCE_OPTIONS.map((opt) => (
                     <div key={opt} className="flex items-center gap-2">
                       <input
@@ -980,6 +943,44 @@ export default function IssueVoucherWizardPage() {
                 </div>
               </div>
 
+              <div className="space-y-2">
+                <Label>Number of people the voucher is for (by age group)</Label>
+                <p className="text-sm text-muted-foreground">
+                  Enter the number of people in each age group that this voucher will support.
+                </p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                  {HOUSEHOLD_AGE_BANDS.map((band) => {
+                    const current = referral.householdByAge != null && typeof referral.householdByAge === "object"
+                      ? (referral.householdByAge as Record<string, number>)[band]
+                      : undefined;
+                    const num = current != null && typeof current === "number" ? current : 0;
+                    return (
+                      <div key={band} className="flex items-center gap-2">
+                        <Label htmlFor={`household-${band}`} className="shrink-0 text-sm">{band}yrs</Label>
+                        <Input
+                          id={`household-${band}`}
+                          type="number"
+                          min={0}
+                          max={99}
+                          value={num}
+                          onChange={(e) => {
+                            const v = parseInt(e.target.value, 10);
+                            const n = Number.isNaN(v) ? 0 : Math.max(0, Math.min(99, v));
+                            const prev = (referral.householdByAge != null && typeof referral.householdByAge === "object")
+                              ? { ...(referral.householdByAge as Record<string, number>) }
+                              : {};
+                            setReferral((r) => ({
+                              ...r,
+                              householdByAge: { ...prev, [band]: n },
+                            }));
+                          }}
+                        />
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
               <div className="flex items-center gap-2">
                 <input
                   type="checkbox"
@@ -990,7 +991,7 @@ export default function IssueVoucherWizardPage() {
                   }
                   className="h-4 w-4 rounded border-input"
                 />
-                <Label htmlFor="contactConsent" className="cursor-pointer">Contact consent *</Label>
+                <Label htmlFor="contactConsent" className="cursor-pointer">Contact consent{selectedOrgsRules ? "" : " *"}</Label>
               </div>
               <div className="flex items-center gap-2">
                 <input
@@ -1002,7 +1003,7 @@ export default function IssueVoucherWizardPage() {
                   }
                   className="h-4 w-4 rounded border-input"
                 />
-                <Label htmlFor="dietaryConsent" className="cursor-pointer">Dietary consent *</Label>
+                <Label htmlFor="dietaryConsent" className="cursor-pointer">Dietary consent{selectedOrgsRules ? "" : " *"}</Label>
               </div>
               <div className="flex gap-2 pt-2">
                 <Button onClick={() => setStep(2)} variant="outline">
@@ -1026,7 +1027,7 @@ export default function IssueVoucherWizardPage() {
           <CardHeader>
             <CardTitle>Step 4 — Voucher details</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+            <CardContent className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
                 <Label>Issue date *</Label>
@@ -1036,14 +1037,16 @@ export default function IssueVoucherWizardPage() {
                   onChange={(e) => setIssueDate(e.target.value)}
                 />
               </div>
-              <div className="space-y-2">
-                <Label>Expiry date *</Label>
-                <Input
-                  type="date"
-                  value={expiryDate}
-                  onChange={(e) => setExpiryDate(e.target.value)}
-                />
-              </div>
+              {!selectedOrgsRules && (
+                <div className="space-y-2">
+                  <Label>Expiry date *</Label>
+                  <Input
+                    type="date"
+                    value={expiryDate}
+                    onChange={(e) => setExpiryDate(e.target.value)}
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label>Referral agency *</Label>
@@ -1052,15 +1055,16 @@ export default function IssueVoucherWizardPage() {
                   className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                   value={agencyId}
                   onChange={(e) => setAgencyId(e.target.value)}
+                  disabled={isThirdPartyAgency}
                 >
                   <option value="">Select agency</option>
-                  {agencies.map((a) => (
+                  {agenciesToShow.map((a) => (
                     <option key={a.id} value={a.id}>
                       {a.name}
                     </option>
                   ))}
                 </select>
-                {canManageAgenciesAndCenters && (
+                {canManageAgenciesAndCenters && !isThirdPartyAgency && (
                   <Button
                     type="button"
                     variant="outline"
@@ -1128,6 +1132,7 @@ export default function IssueVoucherWizardPage() {
                   className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
                   value={foodBankCenterId}
                   onChange={(e) => setFoodBankCenterId(e.target.value)}
+                  disabled={selectedOrgsRules && centers.length === 1}
                 >
                   <option value="">Select centre</option>
                   {centers.map((c) => (
@@ -1137,7 +1142,7 @@ export default function IssueVoucherWizardPage() {
                     </option>
                   ))}
                 </select>
-                {canManageAgenciesAndCenters && (
+                {canManageAgenciesAndCenters && !selectedOrgsRules && (
                   <Button
                     type="button"
                     variant="outline"
@@ -1149,13 +1154,15 @@ export default function IssueVoucherWizardPage() {
                 )}
               </div>
             </div>
-            <div className="space-y-2">
-              <Label>Collection notes (optional)</Label>
-              <Input
-                value={collectionNotes}
-                onChange={(e) => setCollectionNotes(e.target.value)}
-              />
-            </div>
+            {/* {!selectedOrgsRules && ( */}
+              <div className="space-y-2">
+                <Label>Collection notes (optional)</Label>
+                <Input
+                  value={collectionNotes}
+                  onChange={(e) => setCollectionNotes(e.target.value)}
+                />
+              </div>
+            {/* )} */}
             <div className="flex gap-2 pt-2">
               <Button onClick={() => setStep(4)} variant="outline">
                 Back
@@ -1186,7 +1193,7 @@ export default function IssueVoucherWizardPage() {
                   Voucher code: <span className="font-mono">{createdCode}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Expiry: {formatDate(expiryDate)}
+                  Expiry: {selectedOrgsRules ? (() => { const d = new Date(issueDate); d.setDate(d.getDate() + 7); return formatDate(d.toISOString().slice(0, 10)); })() : formatDate(expiryDate)}
                 </p>
                 <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
                   <p><span className="font-medium text-muted-foreground">Client:</span> {selectedClient?.firstName} {selectedClient?.surname}</p>
@@ -1215,7 +1222,7 @@ export default function IssueVoucherWizardPage() {
                     <p><span className="font-medium text-muted-foreground">Client:</span> {selectedClient?.firstName} {selectedClient?.surname}</p>
                     <p><span className="font-medium text-muted-foreground">Agency:</span> {agencies.find((a) => a.id === agencyId)?.name}</p>
                     <p><span className="font-medium text-muted-foreground">Centre:</span> {centers.find((c) => c.id === foodBankCenterId)?.name}</p>
-                    <p><span className="font-medium text-muted-foreground">Issue:</span> {formatDate(issueDate)} — <span className="font-medium text-muted-foreground">Expiry:</span> {formatDate(expiryDate)}
+                    <p><span className="font-medium text-muted-foreground">Issue:</span> {formatDate(issueDate)} — <span className="font-medium text-muted-foreground">Expiry:</span> {selectedOrgsRules ? (() => { const d = new Date(issueDate); d.setDate(d.getDate() + 7); return formatDate(d.toISOString().slice(0, 10)); })() : formatDate(expiryDate)}
                     </p>
                   </section>
                   <section className="rounded-md border bg-muted/30 p-3 space-y-1">

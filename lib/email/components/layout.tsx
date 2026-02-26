@@ -12,18 +12,22 @@ import { EmailFooter } from "./footer";
 interface EmailLayoutProps {
   preview: string;
   children: ReactNode;
+  /** Optional logo URL (e.g. organization logo). When set with organizationName, uses org branding. */
+  logoUrl?: string | null;
+  /** Optional organization name. When set, header/footer show org name; logo alt stays platform name. Omit for platform-only emails (e.g. forgot-password). */
+  organizationName?: string | null;
 }
 
-export function EmailLayout({ preview, children }: EmailLayoutProps) {
+export function EmailLayout({ preview, children, logoUrl, organizationName }: EmailLayoutProps) {
   return (
     <Html>
       <Head />
       <Preview>{preview}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <EmailHeader />
+          <EmailHeader logoUrl={logoUrl} organizationName={organizationName} />
           <div style={content}>{children}</div>
-          <EmailFooter />
+          <EmailFooter logoUrl={logoUrl} organizationName={organizationName} />
         </Container>
       </Body>
     </Html>

@@ -11,7 +11,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "./tabs"
 import { Avatar, AvatarFallback, AvatarImage } from "./avatar"
 import { Badge } from "./badge"
 import { Skeleton } from "./skeleton"
-import { Switch } from "./switch"
 import { useApiError } from "./use-api-error"
 import type { User } from "@ordafy/types"
 import { Loader2, Upload } from "lucide-react"
@@ -66,8 +65,8 @@ export interface ProfileManagerProps {
 }
 
 export function ProfileManager({
-  role,
-  userId,
+  role: _role,
+  userId: _userId,
   onProfileUpdate,
   showLocationSettings = false,
   showSecurityTab = true,
@@ -294,7 +293,7 @@ export function ProfileManager({
     }
   }
 
-  const handleEnable2FALegacy = () => {
+  const _handleEnable2FALegacy = () => {
     if (onNavigateTo2FA) {
       onNavigateTo2FA()
     } else {

@@ -1,115 +1,59 @@
-# Production deployment
+# Production Deployment Checklist
 
-## Production readiness verification
+Use this checklist to deploy Support Hubs to production.
 
-Before release, ensure:
+## Pre-deploy verification
 
-1. **Type check** — `pnpm run type-check` (no TypeScript errors).
-2. **Lint** — `pnpm run lint` (no ESLint errors; warnings are acceptable).
-3. **Build** — `pnpm run build` (production build succeeds).
-4. **Environment** — All required and desired env vars set (see below). Never commit real secrets; use `.env.example` with placeholders only.
-5. **Database** — Migrations applied; seed if needed.
-6. **HTTPS** — Served over HTTPS in production; session cookie is secure when `NODE_ENV=production`.
-
-If `pnpm run build` fails with `EPERM` on `.next`, delete the `.next` folder and retry (e.g. `rm -rf .next` or `Remove-Item -Recurse -Force .next` on Windows).
-
-## Pre-deploy checks
-
-Run the full validation before deploying:
+Run locally before deploying:
 
 ```bash
 pnpm run validate
 ```
 
-This runs, in order:
+This runs, in order: **type-check** → **lint** → **production build**. All must pass.
 
-- **Type check** (`pnpm run type-check`) — TypeScript with no emit
-- **Lint** (`pnpm run lint`) — ESLint for `app`, `lib`, and `components`
-- **Build** (`pnpm run build`) — Next.js production build
+- **TypeScript**: `pnpm run type-check` (no type errors)
+- **ESLint**: `pnpm run lint` (no lint errors; warnings are allowed)
+- **Build**: `pnpm run build` (Next.js production build)
 
-All three must pass with no errors. Fix any type, lint, or build errors before deploying.
+## Required environment variables
 
-## Environment
+These are validated at server startup in production (see `lib/env.ts`). If any are missing, the server will not start.
 
-1. Copy `.env.example` to `.env` (or set env vars in your host).
-2. **Required:**
-   - `DATABASE_URL` — PostgreSQL connection string
-   - `NEXTAUTH_SECRET` (or your session secret) — for production auth
-3. **Recommended for production:**
-   - `NEXT_PUBLIC_APP_URL` — public app URL (password reset links, emails)
-   - `RESEND_API_KEY` — from [Resend](https://resend.com/api-keys); required for emails to be sent
-   - `RESEND_FROM_EMAIL` — verified sender (e.g. `Support Hubs <noreply@yourdomain.com>` or `onboarding@resend.dev` for testing)
-   - `CONTACT_EMAIL` — where contact form submissions are sent (and enquirer gets a confirmation email)
-4. **Optional:** See `.env.example` for email branding, SMTP fallback, Stripe (subscriptions), S3 (logos), etc.
+| Variable | Description |
+|----------|-------------|
+| `DATABASE_URL` | PostgreSQL connection string (e.g. Neon, Supabase, RDS) |
 
-Optional env validation (fail fast if required vars missing): set `VALIDATE_ENV=true` or ensure `NODE_ENV=production` and use `validateEnv()` from `lib/env.ts` in your startup path if desired.
+## Recommended environment variables
+
+Missing recommended vars produce a startup warning but do not block the server. Set these for full functionality:
+
+| Variable | Description |
+|----------|-------------|
+| `NEXTAUTH_SECRET` | Secret for session signing (use a long random string) |
+| `NEXT_PUBLIC_APP_URL` | Public app URL (e.g. `https://app.supporthubs.org`) |
+| `RESEND_API_KEY` | Resend API key for transactional email |
+| `RESEND_FROM_EMAIL` | Verified sender address for Resend |
+| `CONTACT_EMAIL` | Support/contact email (used in footer and forms) |
+
+## Optional / feature-specific
+
+- **Email**: `EMAIL_APP_NAME`, `EMAIL_LOGO_URL`, `EMAIL_COMPANY_NAME`, `EMAIL_COMPANY_URL`, `EMAIL_PRIVACY_URL`, `EMAIL_SUPPORT_EMAIL`, `EMAIL_BRAND_COLOR` — see `lib/email/config.ts`
+- **Multi-tenant**: `APP_DOMAIN`, `NEXT_PUBLIC_APP_DOMAIN` for subdomain routing
+- **Stripe**: `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY`, etc.
+- **AWS S3**: For uploads (e.g. logos, avatars)
 
 ## Database
 
-Before first deploy:
+1. Run migrations: `pnpm run db:migrate:deploy`
+2. (Optional) Seed: `pnpm run db:seed` — only if you use seed data
 
-```bash
-pnpm run db:generate
-pnpm run db:migrate:deploy
-```
+## Security (already configured)
 
-Optional seed (default users/plans):
+- **next.config.ts**: `poweredByHeader: false`; security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`) are set.
+- **Instrumentation**: `instrumentation.ts` runs env validation on Node.js server startup.
 
-```bash
-pnpm run db:seed
-```
+## Post-deploy
 
-## Run production build
-
-```bash
-pnpm run build
-pnpm run start
-```
-
-Or use your host’s Node start command (e.g. `node .next/standalone/server.js` if using `output: 'standalone'`).
-
-## Security (included in build)
-
-- `X-Content-Type-Options: nosniff`
-- `X-Frame-Options: DENY`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `X-Powered-By` header disabled
-
-Configure HTTPS and any extra headers (CSP, HSTS) at the reverse proxy or platform.
-
-## Health check
-
-- `GET /api/health` — returns `{ ok: true, database: "connected"|"disconnected" }`. Use for load balancer or container readiness.
-
-## Post-deploy checklist
-
-- [ ] HTTPS enabled at reverse proxy / host
-- [ ] `NEXT_PUBLIC_APP_URL` points to production URL
-- [ ] Emails: Resend (or SMTP) configured; contact form and password reset tested
-- [ ] Subscriptions (if used): `SUBSCRIPTION_ENABLED=true`, Stripe webhook URL and secret set, plans have `stripePriceId` or use auto-created Stripe prices
-- [ ] Session cookie: secure in production (handled when `NODE_ENV=production`)
-- [ ] Multi-tenant: `APP_DOMAIN` set to your main domain (e.g. `supporthubs.org`) for production subdomains
-- [ ] Stripe (if used): webhook endpoint URL and `STRIPE_WEBHOOK_SECRET` set in Dashboard; `STRIPE_SECRET_KEY` in env
-
-## Vercel + wildcard subdomains (multi-tenant)
-
-If you deploy on Vercel with a root domain and wildcard subdomains (e.g. `supporthubs.org` and `*.supporthubs.org`):
-
-1. **Domains in Vercel**  
-   In **Project → Settings → Domains**, add:
-   - `supporthubs.org`
-   - `*.supporthubs.org`  
-   With DNS managed by Vercel, the wildcard A/CNAME is usually created for you.
-
-2. **Environment variables (required for tenant branding)**  
-   In **Project → Settings → Environment Variables**, set for Production (and Preview if you want tenant behaviour there):
-   - `APP_DOMAIN=supporthubs.org`  
-     Used by `lib/tenant.ts` to parse the subdomain from the request host (e.g. `abc.supporthubs.org` → `abc`). If this is unset, it defaults to `localhost`, so production subdomains are not recognised and you see platform branding on every subdomain.
-   - `NEXT_PUBLIC_APP_DOMAIN=supporthubs.org`  
-     Optional; used by client-side tenant URL helpers (e.g. login redirects).
-
-3. **No middleware or URL rewrite needed**  
-   The app does **not** use a `[tenant]` segment in the path. Tenant is resolved from the **Host** header in API routes (e.g. `/api/tenant/branding` via `getTenantFromRequest`). The browser request to `abc.supporthubs.org/api/tenant/branding` already sends `Host: abc.supporthubs.org`; the server only needs `APP_DOMAIN` to parse `abc` and look up the organization. No cookie or middleware rewrite is required.
-
-4. **Reserved subdomains**  
-   Subdomains `www`, `app`, `api`, `admin`, `platform`, `mail` are treated as platform (default branding), not tenants.
+1. Smoke-test: log in, load dashboard, trigger a password reset (or invitation) and confirm email is sent if Resend is configured.
+2. Monitor logs for `[Env validation]` warnings about missing recommended vars.

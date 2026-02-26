@@ -1,18 +1,27 @@
 import { Section, Text, Img } from "@react-email/components";
 import { EMAIL_APP_NAME, EMAIL_LOGO_URL, EMAIL_BRAND_COLOR } from "../config";
 
-export function EmailHeader() {
+export interface EmailHeaderProps {
+  /** Override logo (e.g. organization logo). If not set, uses EMAIL_LOGO_URL then app name text. */
+  logoUrl?: string | null;
+  /** When set (e.g. tenant emails), text fallback shows org name. Logo image alt always uses platform name for accessibility. */
+  organizationName?: string | null;
+}
+
+export function EmailHeader({ logoUrl: logoUrlOverride, organizationName }: EmailHeaderProps = {}) {
+  const logoUrl = logoUrlOverride != null && logoUrlOverride !== "" ? logoUrlOverride : EMAIL_LOGO_URL;
+  const displayName = organizationName != null && organizationName !== "" ? organizationName : EMAIL_APP_NAME;
   return (
     <Section style={{ ...header, backgroundColor: EMAIL_BRAND_COLOR }}>
-      {EMAIL_LOGO_URL ? (
+      {logoUrl ? (
         <Img
-          src={EMAIL_LOGO_URL}
+          src={logoUrl}
           alt={EMAIL_APP_NAME}
           width={160}
           style={logoImage}
         />
       ) : (
-        <Text style={logoText}>{EMAIL_APP_NAME}</Text>
+        <Text style={logoText}>{displayName}</Text>
       )}
     </Section>
   );

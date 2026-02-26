@@ -303,6 +303,12 @@ export class ApiClient {
       this.request<{ message: string }>(`/api/vouchers/${encodeURIComponent(id)}`, {
         method: "PATCH",
       }),
+    /** PATCH /api/vouchers/[id]/unfulfilled — mark as unfulfilled with optional reason. Only for issued vouchers. */
+    unfulfilled: (id: string, payload?: { reason?: string }): Promise<{ id: string; code: string; status: string; unfulfilledReason: string | null }> =>
+      this.request(`/api/vouchers/${encodeURIComponent(id)}/unfulfilled`, {
+        method: "PATCH",
+        body: JSON.stringify(payload ?? {}),
+      }),
     /** DELETE /api/vouchers/[id] — only when voucher has no redemptions. */
     delete: (id: string): Promise<{ message: string }> =>
       this.request<{ message: string }>(`/api/vouchers/${encodeURIComponent(id)}`, {

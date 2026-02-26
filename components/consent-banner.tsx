@@ -81,7 +81,7 @@ export function ConsentBanner({ webUrl, className, source = "web", onConsentUpda
             if (data?.termsOfService && data?.privacyPolicy) {
               shouldShowBanner = false
             }
-          } catch (error) {
+          } catch {
             // User not authenticated or API error
             setIsAuthenticated(false)
           }
@@ -101,12 +101,12 @@ export function ConsentBanner({ webUrl, className, source = "web", onConsentUpda
             } else {
               setIsAuthenticated(false)
             }
-          } catch (error) {
+          } catch {
             // User not authenticated or API error
             setIsAuthenticated(false)
           }
         }
-      } catch (error) {
+      } catch {
         // User not authenticated or API error
         setIsAuthenticated(false)
       }
@@ -122,7 +122,7 @@ export function ConsentBanner({ webUrl, className, source = "web", onConsentUpda
           if (parsed.termsOfService && parsed.privacyPolicy) {
             shouldShowBanner = false
           }
-        } catch (error) {
+        } catch {
           // Invalid stored consent, continue to show banner
         }
       }
@@ -286,7 +286,7 @@ export function ConsentBanner({ webUrl, className, source = "web", onConsentUpda
       if (dismissed === "true") {
         return null
       }
-    } catch (error) {
+    } catch {
       // Ignore sessionStorage errors
     }
   }

@@ -64,7 +64,7 @@ export async function sendEmail(options: SendEmailOptions): Promise<void> {
   const effectiveReplyTo = replyTo ?? (EMAIL_SUPPORT_EMAIL ? [EMAIL_SUPPORT_EMAIL] : undefined);
 
   // 1) Try Resend first when API key is set
-  if (process.env.TESTING !== "true" && process.env.RESEND_API_KEY) {
+  if (process.env.IS_ORDAFY_SEND_EMAIL !== "true" && process.env.RESEND_API_KEY) {
     try {
       let resendAttachments: { filename: string; content: string }[] = [];
       if (attachments?.length) {

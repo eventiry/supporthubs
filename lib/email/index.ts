@@ -5,6 +5,8 @@ export * from "./config";
 export { Button } from "./components/button";
 export { PasswordResetEmail } from "./templates/password-reset";
 export type { PasswordResetEmailProps } from "./templates/password-reset";
+export { SetPasswordEmail } from "./templates/set-password";
+export type { SetPasswordEmailProps } from "./templates/set-password";
 export { InvitationEmail } from "./templates/invitation";
 export type { InvitationEmailProps } from "./templates/invitation";
 export { ContactSubmissionEmail } from "./templates/contact-submission";

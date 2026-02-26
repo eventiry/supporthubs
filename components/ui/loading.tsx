@@ -2,8 +2,6 @@
 
 import { cn } from "@/lib/utils";
 
-const APP_NAME = "Support Hubs";
-
 export interface LoadingProps {
   /** Message shown below the spinner. Default: "Loading…" */
   message?: string;

@@ -7,14 +7,24 @@ const RESET_LINK_TTL_HOURS = 1;
 export interface PasswordResetEmailProps {
   firstName: string;
   resetUrl: string;
+  /** When user belongs to an org, pass for org-scoped branding; otherwise platform branding is used. */
+  organizationName?: string | null;
+  /** Organization logo URL when org-scoped. */
+  logoUrl?: string | null;
 }
 
 export function PasswordResetEmail({
   firstName,
   resetUrl,
+  organizationName,
+  logoUrl,
 }: PasswordResetEmailProps) {
   return (
-    <EmailLayout preview={`Reset your ${EMAIL_APP_NAME} password`}>
+    <EmailLayout
+      preview={`Reset your ${EMAIL_APP_NAME} password`}
+      organizationName={organizationName}
+      logoUrl={logoUrl}
+    >
       <Heading style={h1}>Password reset</Heading>
       <Text style={text}>Hi {firstName},</Text>
       <Text style={text}>
@@ -33,7 +43,7 @@ export function PasswordResetEmail({
       <Text style={signature}>
         Best regards,
         <br />
-        The {EMAIL_APP_NAME} team
+        The {organizationName ?? EMAIL_APP_NAME} team
       </Text>
     </EmailLayout>
   );

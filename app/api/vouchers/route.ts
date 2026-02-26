@@ -7,10 +7,12 @@ import { createAuditLog } from "@/lib/audit";
 import { AuditAction } from "@prisma/client";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
 import { canCreateVoucher } from "@/lib/subscription";
+import { isOrgInSelectedOrgs, SELECTED_ORGS } from "@/lib/config";
 
 const SIX_MONTHS_MS = 6 * 30 * 24 * 60 * 60 * 1000;
 const NOTES_MAX_LENGTH = 400;
 const PARCEL_NOTES_MAX_LENGTH = 400;
+const SELECTED_ORGS_EXPIRY_DAYS = 7;
 
 function randomAlphanumeric(length: number): string {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -36,6 +38,23 @@ async function generateUniqueVoucherCode(): Promise<string> {
     if (!existing) return code;
   }
   throw new Error("Could not generate unique voucher code");
+}
+
+/** For selected-orgs: E-001-0001, E-001-0002, ... (org index 001, 4-digit sequence per org). */
+async function generateIncrementalVoucherCode(organizationId: string): Promise<string> {
+  const idx = SELECTED_ORGS.indexOf(organizationId);
+  const prefix = `E-${String(idx >= 0 ? idx + 1 : 1).padStart(3, "0")}`;
+  const count = await db.voucher.count({
+    where: {
+      organizationId,
+      code: { startsWith: prefix + "-" },
+    },
+  });
+  const seq = count + 1;
+  const code = `${prefix}-${String(seq).padStart(4, "0")}`;
+  const existing = await db.voucher.findUnique({ where: { code } });
+  if (existing) throw new Error("Voucher code collision");
+  return code;
 }
 
 export async function GET(req: NextRequest) {
@@ -139,9 +158,15 @@ export async function POST(req: NextRequest) {
   const collectionNotes =
     typeof payload.collectionNotes === "string" ? payload.collectionNotes.trim() || undefined : undefined;
 
-  if (!clientId || !agencyId || !referralDetails || !issueDateStr || !expiryDateStr) {
+  const selectedOrgsRules = isOrgInSelectedOrgs(tenant.organizationId);
+  const requireExpiry = !selectedOrgsRules;
+  if (!clientId || !agencyId || !referralDetails || !issueDateStr || (requireExpiry && !expiryDateStr)) {
     return NextResponse.json(
-      { message: "Missing required fields: clientId, agencyId, referralDetails, issueDate, expiryDate" },
+      {
+        message: requireExpiry
+          ? "Missing required fields: clientId, agencyId, referralDetails, issueDate, expiryDate"
+          : "Missing required fields: clientId, agencyId, referralDetails, issueDate",
+      },
       { status: 400 }
     );
   }
@@ -164,7 +189,7 @@ export async function POST(req: NextRequest) {
 
   const contactConsent = referralDetails.contactConsent === true;
   const dietaryConsent = referralDetails.dietaryConsent === true;
-  if (!contactConsent || !dietaryConsent) {
+  if (!selectedOrgsRules && (!contactConsent || !dietaryConsent)) {
     return NextResponse.json(
       { message: "Contact consent and dietary consent are required" },
       { status: 400 }
@@ -209,9 +234,18 @@ export async function POST(req: NextRequest) {
   }
 
   const issueDate = new Date(issueDateStr);
-  const expiryDate = new Date(expiryDateStr);
-  if (Number.isNaN(issueDate.getTime()) || Number.isNaN(expiryDate.getTime())) {
-    return NextResponse.json({ message: "Invalid issue or expiry date" }, { status: 400 });
+  if (Number.isNaN(issueDate.getTime())) {
+    return NextResponse.json({ message: "Invalid issue date" }, { status: 400 });
+  }
+  let expiryDate: Date;
+  if (selectedOrgsRules) {
+    expiryDate = new Date(issueDate);
+    expiryDate.setDate(expiryDate.getDate() + SELECTED_ORGS_EXPIRY_DAYS);
+  } else {
+    expiryDate = new Date(expiryDateStr);
+    if (Number.isNaN(expiryDate.getTime())) {
+      return NextResponse.json({ message: "Invalid expiry date" }, { status: 400 });
+    }
   }
 
   const isPlatformAdmin = user.organizationId === null;
@@ -237,8 +271,8 @@ export async function POST(req: NextRequest) {
         referralDetails.householdByAge != null && typeof referralDetails.householdByAge === "object"
           ? referralDetails.householdByAge
           : undefined,
-      contactConsent: true,
-      dietaryConsent: true,
+      contactConsent: selectedOrgsRules ? contactConsent : true,
+      dietaryConsent: selectedOrgsRules ? dietaryConsent : true,
       dietaryRequirements:
         typeof referralDetails.dietaryRequirements === "string"
           ? referralDetails.dietaryRequirements
@@ -248,7 +282,9 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const code = await generateUniqueVoucherCode();
+  const code = selectedOrgsRules
+    ? await generateIncrementalVoucherCode(tenant.organizationId)
+    : await generateUniqueVoucherCode();
 
   const voucher = await db.voucher.create({
     data: {
@@ -261,7 +297,7 @@ export async function POST(req: NextRequest) {
       issueDate,
       expiryDate,
       issuedById: user.id,
-      collectionNotes,
+      collectionNotes: selectedOrgsRules ? undefined : collectionNotes,
     },
     include: {
       client: { select: { firstName: true, surname: true } },

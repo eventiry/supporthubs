@@ -10,9 +10,18 @@ import {
   EMAIL_BRAND_COLOR,
 } from "../config";
 
-export function EmailFooter() {
+export interface EmailFooterProps {
+  /** Override logo (e.g. organization logo). If not set, uses EMAIL_LOGO_URL (platform logo). */
+  logoUrl?: string | null;
+  /** When set (e.g. tenant emails), brand text shows org name. Logo image alt always uses platform name. */
+  organizationName?: string | null;
+}
+
+export function EmailFooter({ logoUrl: logoUrlOverride, organizationName }: EmailFooterProps = {}) {
   const currentYear = new Date().getFullYear();
-  const appUrl = EMAIL_APP_URL.replace(/\/$/, "");
+  const _appUrl = EMAIL_APP_URL.replace(/\/$/, ""); // Reserved for optional Product links block
+  const logoUrl = logoUrlOverride != null && logoUrlOverride !== "" ? logoUrlOverride : EMAIL_LOGO_URL;
+  const brandName = organizationName != null && organizationName !== "" ? organizationName : EMAIL_APP_NAME;
 
   return (
     <>
@@ -20,29 +29,29 @@ export function EmailFooter() {
       <Section style={footer}>
         {/* Brand block */}
         <Section style={brandBlock}>
-          {EMAIL_LOGO_URL ? (
+          {logoUrl ? (
             <Img
-              src={EMAIL_LOGO_URL}
+              src={logoUrl}
               alt={EMAIL_APP_NAME}
               width={120}
               style={footerLogo}
             />
           ) : null}
-          <Text style={footerBrandText}>{EMAIL_APP_NAME}</Text>
+          <Text style={footerBrandText}>{brandName}</Text>
           <Text style={tagline}>
             Voucher and client management for food bank partners.
           </Text>
         </Section>
 
         {/* Links: Product */}
-        <Text style={linksHeading}>Product</Text>
+        {/* <Text style={linksHeading}>Product</Text>
         <Text style={linksLine}>
-          <Link href={appUrl} style={link}>Home</Link>
+          <Link href={_appUrl} style={link}>Home</Link>
           {" · "}
-          <Link href={`${appUrl}/pricing`} style={link}>Pricing</Link>
+          <Link href={`${_appUrl}/pricing`} style={link}>Pricing</Link>
           {" · "}
-          <Link href={`${appUrl}/contact`} style={link}>Contact</Link>
-        </Text>
+          <Link href={`${_appUrl}/contact`} style={link}>Contact</Link>
+        </Text> */}
 
         {/* Links: Support */}
         <Text style={linksHeading}>Support</Text>
@@ -88,6 +97,7 @@ const hrThin = {
 const footer = {
   padding: "32px 40px 28px",
   backgroundColor: "#f8fafc",
+  borderTop: `3px solid ${EMAIL_BRAND_COLOR}`,
 };
 
 const brandBlock = {

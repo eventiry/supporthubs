@@ -23,6 +23,7 @@ enum VoucherStatus {
   issued
   redeemed
   expired
+  unfulfilled
 }
 
 enum AuditAction {
@@ -298,6 +299,7 @@ model FoodBankCenter {
   postcode       String?
   phone          String?
   email          String?
+  openingHours   Json?    // e.g. { "Mon": "10:00-11:30", "Thu": "10:00-13:00" }
   canDeliver     Boolean  @default(false)
   organizationId String
   createdAt      DateTime @default(now())
@@ -324,6 +326,7 @@ model Voucher {
   status             VoucherStatus @default(issued)
   issuedById         String
   collectionNotes    String?
+  unfulfilledReason  String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
 

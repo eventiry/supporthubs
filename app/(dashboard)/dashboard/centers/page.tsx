@@ -8,7 +8,6 @@ import { Permission } from "@/lib/rbac/permissions";
 import type { FoodBankCenter } from "@/lib/types";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
-import { Label } from "@/components/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import {
   Table,
@@ -36,6 +35,7 @@ import {
   AlertDialogTitle,
 } from "@/components/alert-dialog";
 import { Loading } from "@/components/ui/loading";
+import { CenterForm } from "@/components/center-form";
 import { Eye, Pencil, Trash2 } from "lucide-react";
 
 export default function CentersPage() {
@@ -46,23 +46,11 @@ export default function CentersPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
-  const [createName, setCreateName] = useState("");
-  const [createAddress, setCreateAddress] = useState("");
-  const [createPostcode, setCreatePostcode] = useState("");
-  const [createPhone, setCreatePhone] = useState("");
-  const [createEmail, setCreateEmail] = useState("");
-  const [createCanDeliver, setCreateCanDeliver] = useState(false);
   const [createLoading, setCreateLoading] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const [viewCenter, setViewCenter] = useState<FoodBankCenter | null>(null);
   const [editCenter, setEditCenter] = useState<FoodBankCenter | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editAddress, setEditAddress] = useState("");
-  const [editPostcode, setEditPostcode] = useState("");
-  const [editPhone, setEditPhone] = useState("");
-  const [editEmail, setEditEmail] = useState("");
-  const [editCanDeliver, setEditCanDeliver] = useState(false);
   const [editLoading, setEditLoading] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
   const [deleteCenter, setDeleteCenter] = useState<FoodBankCenter | null>(null);
@@ -99,32 +87,31 @@ export default function CentersPage() {
     }
   }, [canManage]);
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleCreate(values: {
+    name: string;
+    address: string;
+    postcode: string;
+    phone: string;
+    email: string;
+    canDeliver: boolean;
+    openingHours: Record<string, string>;
+  }) {
     setCreateError(null);
-    const name = createName.trim();
-    if (!name) {
-      setCreateError("Centre name is required.");
-      return;
-    }
     setCreateLoading(true);
     try {
+      const openingHours =
+        values.openingHours && Object.keys(values.openingHours).length > 0 ? values.openingHours : undefined;
       await api.centers.create({
-        name,
-        address: createAddress.trim() || undefined,
-        postcode: createPostcode.trim() || undefined,
-        phone: createPhone.trim() || undefined,
-        email: createEmail.trim() || undefined,
-        canDeliver: createCanDeliver,
+        name: values.name,
+        address: values.address || undefined,
+        postcode: values.postcode || undefined,
+        phone: values.phone || undefined,
+        email: values.email || undefined,
+        openingHours: openingHours ?? undefined,
+        canDeliver: values.canDeliver,
       });
       api.centers.list().then(setCenters);
       setShowCreate(false);
-      setCreateName("");
-      setCreateAddress("");
-      setCreatePostcode("");
-      setCreatePhone("");
-      setCreateEmail("");
-      setCreateCanDeliver(false);
     } catch (err) {
       setCreateError(getErrorMessage(err));
     } finally {
@@ -134,33 +121,32 @@ export default function CentersPage() {
 
   function openEdit(c: FoodBankCenter) {
     setEditCenter(c);
-    setEditName(c.name);
-    setEditAddress(c.address ?? "");
-    setEditPostcode(c.postcode ?? "");
-    setEditPhone(c.phone ?? "");
-    setEditEmail(c.email ?? "");
-    setEditCanDeliver(c.canDeliver);
     setEditError(null);
   }
 
-  async function handleEdit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleEdit(values: {
+    name: string;
+    address: string;
+    postcode: string;
+    phone: string;
+    email: string;
+    canDeliver: boolean;
+    openingHours: Record<string, string>;
+  }) {
     if (!editCenter) return;
     setEditError(null);
-    const name = editName.trim();
-    if (!name) {
-      setEditError("Centre name is required.");
-      return;
-    }
     setEditLoading(true);
     try {
+      const openingHours =
+        values.openingHours && Object.keys(values.openingHours).length > 0 ? values.openingHours : null;
       await api.centers.update(editCenter.id, {
-        name,
-        address: editAddress.trim() || null,
-        postcode: editPostcode.trim() || null,
-        phone: editPhone.trim() || null,
-        email: editEmail.trim() || null,
-        canDeliver: editCanDeliver,
+        name: values.name,
+        address: values.address || null,
+        postcode: values.postcode || null,
+        phone: values.phone || null,
+        email: values.email || null,
+        openingHours,
+        canDeliver: values.canDeliver,
       });
       api.centers.list().then(setCenters);
       setEditCenter(null);
@@ -216,7 +202,7 @@ export default function CentersPage() {
         Add centres here; they appear in the voucher issue and redeem flows.
       </p>
 
-      <Dialog open={showCreate} onOpenChange={setShowCreate}>
+      <Dialog open={showCreate} onOpenChange={(open) => { setShowCreate(open); if (!open) setCreateError(null); }}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>New centre</DialogTitle>
@@ -224,101 +210,17 @@ export default function CentersPage() {
               Add a food bank centre. Name is required; other fields are optional.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleCreate} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="center-name">Name *</Label>
-              <Input
-                id="center-name"
-                value={createName}
-                onChange={(e) => setCreateName(e.target.value)}
-                placeholder="e.g. North East Food Bank"
-                required
-                disabled={createLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="center-address">Address</Label>
-              <Input
-                id="center-address"
-                value={createAddress}
-                onChange={(e) => setCreateAddress(e.target.value)}
-                placeholder="Optional"
-                disabled={createLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="center-postcode">Postcode</Label>
-              <Input
-                id="center-postcode"
-                value={createPostcode}
-                onChange={(e) => setCreatePostcode(e.target.value)}
-                placeholder="Optional"
-                disabled={createLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="center-phone">Phone</Label>
-              <Input
-                id="center-phone"
-                type="tel"
-                value={createPhone}
-                onChange={(e) => setCreatePhone(e.target.value)}
-                placeholder="Optional"
-                disabled={createLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="center-email">Email</Label>
-              <Input
-                id="center-email"
-                type="email"
-                value={createEmail}
-                onChange={(e) => setCreateEmail(e.target.value)}
-                placeholder="Optional"
-                disabled={createLoading}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="center-canDeliver"
-                checked={createCanDeliver}
-                onChange={(e) => setCreateCanDeliver(e.target.checked)}
-                className="h-4 w-4 rounded border-input"
-                disabled={createLoading}
-              />
-              <Label htmlFor="center-canDeliver" className="cursor-pointer">
-                Can deliver
-              </Label>
-            </div>
-            {createError && (
-              <p className="text-sm text-destructive" role="alert">
-                {createError}
-              </p>
-            )}
-            <div className="flex gap-2">
-              <Button type="submit" disabled={createLoading}>
-                {createLoading ? "Creating…" : "Create centre"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  setShowCreate(false);
-                  setCreateError(null);
-                  setCreateName("");
-                  setCreateAddress("");
-                  setCreatePostcode("");
-                  setCreatePhone("");
-                  setCreateEmail("");
-                  setCreateCanDeliver(false);
-                }}
-                disabled={createLoading}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
+          <CenterForm
+            onSubmit={handleCreate}
+            onCancel={() => {
+              setShowCreate(false);
+              setCreateError(null);
+            }}
+            submitLabel="Create centre"
+            loading={createLoading}
+            error={createError}
+            idPrefix="center"
+          />
         </DialogContent>
       </Dialog>
 
@@ -351,6 +253,16 @@ export default function CentersPage() {
                   <span className="font-medium text-muted-foreground">Can deliver</span>
                   <p className="mt-0.5">{viewCenter.canDeliver ? "Yes" : "No"}</p>
                 </div>
+                {"openingHours" in viewCenter && viewCenter.openingHours != null && typeof viewCenter.openingHours === "object" && !Array.isArray(viewCenter.openingHours) && (
+                  <div>
+                    <span className="font-medium text-muted-foreground">Opening hours</span>
+                    <p className="mt-0.5">
+                      {Object.entries(viewCenter.openingHours as Record<string, string>)
+                        .map(([day, hours]) => `${day}: ${hours}`)
+                        .join(" · ") || "—"}
+                    </p>
+                  </div>
+                )}
               </div>
               <div className="flex justify-end pt-2">
                 <Button variant="outline" onClick={() => setViewCenter(null)}>
@@ -362,7 +274,7 @@ export default function CentersPage() {
         </DialogContent>
       </Dialog>
 
-      <Dialog open={!!editCenter} onOpenChange={(open) => !open && setEditCenter(null)}>
+      <Dialog open={!!editCenter} onOpenChange={(open) => !open && (setEditCenter(null), setEditError(null))}>
         <DialogContent>
           {editCenter && (
             <>
@@ -370,92 +282,18 @@ export default function CentersPage() {
                 <DialogTitle>Edit centre</DialogTitle>
                 <DialogDescription>Update centre details.</DialogDescription>
               </DialogHeader>
-              <form onSubmit={handleEdit} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="edit-center-name">Name *</Label>
-                  <Input
-                    id="edit-center-name"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="e.g. North East Food Bank"
-                    required
-                    disabled={editLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-center-address">Address</Label>
-                  <Input
-                    id="edit-center-address"
-                    value={editAddress}
-                    onChange={(e) => setEditAddress(e.target.value)}
-                    placeholder="Optional"
-                    disabled={editLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-center-postcode">Postcode</Label>
-                  <Input
-                    id="edit-center-postcode"
-                    value={editPostcode}
-                    onChange={(e) => setEditPostcode(e.target.value)}
-                    placeholder="Optional"
-                    disabled={editLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-center-phone">Phone</Label>
-                  <Input
-                    id="edit-center-phone"
-                    type="tel"
-                    value={editPhone}
-                    onChange={(e) => setEditPhone(e.target.value)}
-                    placeholder="Optional"
-                    disabled={editLoading}
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="edit-center-email">Email</Label>
-                  <Input
-                    id="edit-center-email"
-                    type="email"
-                    value={editEmail}
-                    onChange={(e) => setEditEmail(e.target.value)}
-                    placeholder="Optional"
-                    disabled={editLoading}
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="edit-center-canDeliver"
-                    checked={editCanDeliver}
-                    onChange={(e) => setEditCanDeliver(e.target.checked)}
-                    className="h-4 w-4 rounded border-input"
-                    disabled={editLoading}
-                  />
-                  <Label htmlFor="edit-center-canDeliver" className="cursor-pointer">
-                    Can deliver
-                  </Label>
-                </div>
-                {editError && (
-                  <p className="text-sm text-destructive" role="alert">
-                    {editError}
-                  </p>
-                )}
-                <div className="flex gap-2">
-                  <Button type="submit" disabled={editLoading}>
-                    {editLoading ? "Saving…" : "Save"}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setEditCenter(null)}
-                    disabled={editLoading}
-                  >
-                    Cancel
-                  </Button>
-                </div>
-              </form>
+              <CenterForm
+                center={editCenter}
+                onSubmit={handleEdit}
+                onCancel={() => {
+                  setEditCenter(null);
+                  setEditError(null);
+                }}
+                submitLabel="Save"
+                loading={editLoading}
+                error={editError}
+                idPrefix="edit-center"
+              />
             </>
           )}
         </DialogContent>

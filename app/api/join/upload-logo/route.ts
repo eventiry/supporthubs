@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         Key: key,
         Body: buffer,
         ContentType: file.type,
-        ACL: "public-read",
+        // ACL: "public-read",
       })
     );
   } catch (err: unknown) {

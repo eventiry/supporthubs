@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { createHash, randomBytes } from "crypto";
 import { getPermissionsForRole } from "@/lib/rbac/permissions";
 import { Permission } from "@/lib/rbac/permissions";
 import { db } from "@/lib/db";
@@ -7,6 +8,15 @@ import { createAuditLog } from "@/lib/audit";
 import { AuditAction } from "@prisma/client";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
 import { canCreateUser } from "@/lib/subscription";
+import {
+  sendSetPasswordEmail,
+  SET_PASSWORD_TOKEN_TTL_MS,
+} from "@/lib/auth/send-reset-email";
+import { getRoleDisplayLabel } from "@/lib/rbac/permissions";
+
+function hashToken(token: string): string {
+  return createHash("sha256").update(token, "utf8").digest("hex");
+}
 
 /**
  * GET /api/users — list users (admin only). Optional filter by role, agencyId. Scoped to current tenant org.
@@ -161,6 +171,37 @@ export async function POST(req: NextRequest) {
     entityId: created.id,
     changes: { email: created.email, role: created.role, agencyId: created.agencyId },
   });
+
+  // Send "set up your password" email with token (same flow as forgot-password).
+  const setPasswordToken = randomBytes(32).toString("hex");
+  const tokenHash = hashToken(setPasswordToken);
+  const expiresAt = new Date(Date.now() + SET_PASSWORD_TOKEN_TTL_MS);
+  await db.passwordResetToken.create({
+    data: {
+      userId: created.id,
+      tokenHash,
+      expiresAt,
+    },
+  });
+
+  const organization = await db.organization.findUnique({
+    where: { id: tenant.organizationId },
+    select: { name: true, logoUrl: true },
+  });
+  const organizationName = organization?.name ?? "your organization";
+  const logoUrl = organization?.logoUrl?.trim() || undefined;
+  const roleLabel = getRoleDisplayLabel(created.role);
+
+  try {
+    await sendSetPasswordEmail(created.email, setPasswordToken, created.firstName, organizationName, roleLabel, logoUrl);
+  } catch (err) {
+    if (process.env.NODE_ENV !== "production") {
+      // In development, link may be logged by sendSetPasswordEmail; continue without failing the request.
+    } else {
+      // In production, log but do not fail user creation; the user can use "Forgot password" later.
+      console.error("[Users] Failed to send set-password email:", err);
+    }
+  }
 
   return NextResponse.json(created, { status: 201 });
 }

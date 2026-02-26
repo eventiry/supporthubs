@@ -30,7 +30,7 @@
   }
 }
 
-/* Print: only show .voucher-print-only content; keep it off-screen when not printing */
+/* Print: .voucher-print-only = off-screen until print (used when injecting from detail view). .voucher-print-page = visible on screen, only content when printing (used for ?print=1 route). */
 .voucher-print-only {
   position: fixed;
   left: -9999px;
@@ -42,15 +42,18 @@
     visibility: hidden;
   }
   .voucher-print-only,
-  .voucher-print-only * {
+  .voucher-print-only *,
+  .voucher-print-page,
+  .voucher-print-page * {
     visibility: visible;
   }
-  .voucher-print-only {
-    position: absolute;
-    left: 0;
-    top: 0;
-    z-index: 0;
-    width: 100%;
+  .voucher-print-only,
+  .voucher-print-page {
+    position: absolute !important;
+    left: 0 !important;
+    top: 0 !important;
+    z-index: 9999;
+    width: 100% !important;
     min-height: 100vh;
     background: white;
     padding: 1.5rem;

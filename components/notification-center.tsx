@@ -25,10 +25,10 @@ export function NotificationCenter({ apiAdapter, enableRealtime = true, resolveA
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "unread">("all")
-  const [page, setPage] = useState(1)
+  const [page, _setPage] = useState(1)
 
   // Connect to SSE for real-time notifications
-  const { isConnected } = useNotificationSSE({
+  const { isConnected: _isConnected } = useNotificationSSE({
     enabled: enableRealtime,
     onNotification: (notification) => {
       // Add new notification to the list

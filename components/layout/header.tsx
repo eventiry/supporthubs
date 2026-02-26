@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useState, useEffect } from "react";
-import { Menu, X, LogOut } from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { useSession } from "@/lib/contexts/session-context";
 import { useBranding, getBrandingDisplay } from "@/lib/contexts/branding-context";

@@ -41,13 +41,10 @@ export default function ForgotPasswordPage() {
         Enter your email and we&apos;ll send you a link to reset your password.
       </p>
       {success ? (
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 space-y-4 p-6 rounded-lg border border-green-500 bg-green-500/10">
           <p className="text-sm text-foreground" role="status">
             If an account exists with that email, we&apos;ve sent a link to reset
-            your password. Please check your inbox (and spam folder).
-          </p>
-          <p className="text-sm text-muted-foreground">
-            In development, the reset link may be printed in the server console.
+            your password. Please check your inbox.
           </p>
          </div>
       ) : (

@@ -28,10 +28,7 @@ import { Permission } from "@/lib/rbac/permissions";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useBranding, getBrandingDisplay, getBrandingInitials } from "@/lib/contexts/branding-context";
 import { cn } from "@/lib/utils";
-import { LoadingSkeleton } from "@/components/ui/loading";
-
-const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
-const isSubscriptionEnabled = process.env.SUBSCRIPTION_ENABLED === "true"   
+const isSubscriptionEnabled = process.env.SUBSCRIPTION_ENABLED === "true";   
 const NAV_ITEMS: {
   href: string;
   label: string;
@@ -76,7 +73,7 @@ function NavItems({
         if (item.hidden) return false;
         return true;
       }),
-    [hasPermission, user?.organizationId, isSubscriptionEnabled]
+    [hasPermission, user?.organizationId]
   );
 
   if (isLoading) {
@@ -148,7 +145,7 @@ export function Sidebar({ variant = "default", onItemClick }: SidebarProps) {
   const isMobile = useIsMobile();
   const { branding, isLoading: brandingLoading } = useBranding();
   const { showLogo, showName, displayName } = getBrandingDisplay(branding);
-  const logoUrl = branding?.logoUrl?.trim();
+  const logoUrl = branding?.logoUrl?.trim() ;
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isMounted, setIsMounted] = useState(false);
 

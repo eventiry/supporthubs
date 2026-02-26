@@ -21,98 +21,143 @@ import {
 import { Share2, Trash2, Ban, Printer, ArrowLeft } from "lucide-react";
 import { useRouter } from "next/navigation";
 
-/** Print-friendly content for a voucher (used in print window and preview). */
+/** Format householdByAge for print (e.g. { "0-17": 1, "18-24": 0 } → "0-17: 1, 18-24: 0"). */
+function formatHouseholdByAge(householdByAge: unknown): string {
+  if (householdByAge == null || typeof householdByAge !== "object") return "—";
+  const obj = householdByAge as Record<string, number>;
+  const parts = Object.entries(obj)
+    .filter(([, n]) => n != null && Number(n) > 0)
+    .map(([label, n]) => `${label}: ${n}`);
+  return parts.length ? parts.join(", ") : "—";
+}
+
+/** Format openingHours for print (e.g. { "Mon": "10:00-11:30" } → "Mon: 10:00-11:30"). */
+function formatOpeningHours(openingHours: unknown): string {
+  if (openingHours == null || typeof openingHours !== "object") return "";
+  const obj = openingHours as Record<string, string>;
+  return Object.entries(obj)
+    .map(([day, hours]) => `${day}: ${hours}`)
+    .join(" · ");
+}
+
+/** Print-friendly content for a voucher (matches paper voucher layout: org logo, issue date, 7-day text, code, issued by, agency, client, referral details, centre, legal text). */
 export function VoucherPrintContent({ voucher }: { voucher: VoucherDetail }) {
+  const issuedByName =
+    voucher.issuedBy != null
+      ? `${voucher.issuedBy.firstName} ${voucher.issuedBy.lastName}`
+      : "—";
+  const orgLogoUrl = voucher.organization?.logoUrl?.trim();
+  const clientAddress = voucher.client.noFixedAddress
+    ? "No fixed address"
+    : [voucher.client.address, voucher.client.postcode].filter(Boolean).join(", ") || "—";
+
   return (
-    <div className="space-y-4 rounded-lg border bg-white p-6 print:border-0 print:shadow-none">
-      <div className="border-b pb-4">
-        <h2 className="text-lg font-semibold">Food Bank Voucher</h2>
-        <p className="mt-1 font-mono text-xl font-bold">{voucher.code}</p>
-        <p className="text-sm text-muted-foreground">
-          Valid until: {formatDate(voucher.expiryDate)}
+    <div className="space-y-4 rounded-lg border border-black/10 bg-white p-6 text-black print:border print:shadow-none">
+      {/* Org logo */}
+      {orgLogoUrl && (
+        <div className="mb-4 flex justify-start">
+          <img src={orgLogoUrl} alt="" className="h-14 w-auto object-contain" />
+        </div>
+      )}
+      <div className="border-b border-black/20 pb-3">
+        <p className="text-sm">Issue date: {formatDate(voucher.issueDate)}</p>
+        <p className="mt-1 text-sm">
+          Please take this voucher to the selected food bank centre, ideally within 7 days.
         </p>
+        <p className="mt-2 font-mono text-xl font-bold">Voucher code: {voucher.code}</p>
       </div>
-      <section>
-        <h3 className="text-sm font-medium text-muted-foreground">Client</h3>
-        <p className="font-medium">
-          {voucher.client.firstName} {voucher.client.surname}
-        </p>
-        <p className="text-sm">
-          {voucher.client.noFixedAddress
-            ? "No fixed address"
-            : voucher.client.postcode ?? "—"}
-          {voucher.client.address && ` · ${voucher.client.address}`}
-        </p>
+
+      <section className="grid grid-cols-1 gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
+        <p><span className="font-medium">Issued by:</span> {issuedByName}</p>
+        <p><span className="font-medium">Agency name:</span> {voucher.agency.name}</p>
+        <p><span className="font-medium">Telephone:</span> {voucher.agency.contactPhone ?? "—"}</p>
       </section>
-      <section>
-        <h3 className="text-sm font-medium text-muted-foreground">
-          Referral agency
-        </h3>
-        <p>{voucher.agency.name}</p>
-        {(voucher.agency.contactPhone || voucher.agency.contactEmail) && (
-          <p className="text-sm">
-            {voucher.agency.contactPhone}
-            {voucher.agency.contactPhone && voucher.agency.contactEmail && " · "}
-            {voucher.agency.contactEmail}
+
+      <section className="border-t border-black/10 pt-3">
+        <h3 className="text-sm font-semibold">Referred person&apos;s name</h3>
+        <p className="font-medium">{voucher.client.firstName} {voucher.client.surname}</p>
+        <p><span className="font-medium">Address:</span> {clientAddress}</p>
+        <p><span className="font-medium">Phone number:</span> —</p>
+        <p><span className="font-medium">Email:</span> —</p>
+      </section>
+
+      <section className="border-t border-black/10 pt-3 text-sm">
+        {voucher.referralDetails.incomeSource && (
+          <p><span className="font-medium">Source of income in the household:</span> {voucher.referralDetails.incomeSource}</p>
+        )}
+        {voucher.referralDetails.referralReasons != null && typeof voucher.referralDetails.referralReasons === "object" && (
+          <p className="mt-1">
+            <span className="font-medium">Reasons for referral:</span>{" "}
+            {Array.isArray(voucher.referralDetails.referralReasons)
+              ? (voucher.referralDetails.referralReasons as string[]).join(", ")
+              : String(voucher.referralDetails.referralReasons)}
+          </p>
+        )}
+        {voucher.referralDetails.householdByAge != null && (
+          <p className="mt-1">
+            <span className="font-medium">Number of people the voucher is for (by age group):</span>{" "}
+            {formatHouseholdByAge(voucher.referralDetails.householdByAge)}
           </p>
         )}
       </section>
-      <section>
-        <h3 className="text-sm font-medium text-muted-foreground">
-          Reason for referral
-        </h3>
-        <p className="whitespace-pre-wrap text-sm">{voucher.referralDetails.notes}</p>
-        {voucher.referralDetails.dietaryRequirements && (
-          <p className="mt-1 text-sm">
-            Dietary: {voucher.referralDetails.dietaryRequirements}
-          </p>
-        )}
-        {voucher.referralDetails.parcelNotes && (
-          <p className="mt-1 text-sm">
-            Parcel notes: {voucher.referralDetails.parcelNotes}
-          </p>
-        )}
-      </section>
-      {voucher.foodBankCenter && (
-        <section>
-          <h3 className="text-sm font-medium text-muted-foreground">
-            Collection centre
-          </h3>
-          <p>{voucher.foodBankCenter.name}</p>
-          {voucher.foodBankCenter.address && (
-            <p className="text-sm">{voucher.foodBankCenter.address}</p>
-          )}
-          {(voucher.foodBankCenter.postcode || voucher.foodBankCenter.phone) && (
-            <p className="text-sm">
-              {voucher.foodBankCenter.postcode}
-              {voucher.foodBankCenter.postcode && voucher.foodBankCenter.phone && " · "}
-              {voucher.foodBankCenter.phone}
-            </p>
-          )}
-          {voucher.foodBankCenter.email && (
-            <p className="text-sm">{voucher.foodBankCenter.email}</p>
-          )}
+
+      {voucher.referralDetails.parcelNotes && (
+        <section className="border-t border-black/10 pt-3">
+          <p><span className="font-medium">Additional parcel notes:</span> {voucher.referralDetails.parcelNotes}</p>
         </section>
       )}
-      <p className="pt-4 text-xs text-muted-foreground">
-        Issued: {formatDate(voucher.issueDate)} · Code: {voucher.code}
+
+      {voucher.foodBankCenter && (
+        <section className="border-t border-black/10 pt-3">
+          <h3 className="text-sm font-semibold">Assigned food bank centre: {voucher.foodBankCenter.name}</h3>
+          {voucher.foodBankCenter.address && <p className="text-sm">Address: {voucher.foodBankCenter.address}</p>}
+          {voucher.foodBankCenter.postcode && <p className="text-sm">{voucher.foodBankCenter.postcode}</p>}
+          {voucher.foodBankCenter.phone && <p className="text-sm">Contact number: {voucher.foodBankCenter.phone}</p>}
+          {voucher.foodBankCenter.email && <p className="text-sm">Email: {voucher.foodBankCenter.email}</p>}
+          {"openingHours" in voucher.foodBankCenter && voucher.foodBankCenter.openingHours
+            ? (
+                <p className="text-sm">Opening hours: {formatOpeningHours(voucher.foodBankCenter.openingHours)}</p>
+              )
+            : null}
+        </section>
+      )}
+
+      <section className="border-t border-black/10 pt-4 text-xs text-black/80">
+        <p>This voucher has no monetary value and cannot be used by anyone other than the person it was issued to.</p>
+        {/* <p className="mt-1">For help finding a food bank: www.trusselltrust.org.uk/get-help/find-a-foodbank</p>
+        <p className="mt-1">Privacy: https://trusselltrust.org/privacy</p> */}
+      </section>
+
+      <p className="pt-2 text-xs text-black/60">
+        Valid until: {formatDate(voucher.expiryDate)} · Issued: {formatDate(voucher.issueDate)}
       </p>
     </div>
   );
 }
 
-/** Wrapper that triggers window.print() when mounted (for ?print=1 page). */
+/** Wrapper that triggers window.print() when mounted (for ?print=1 page). Content is in DOM and visible so mobile/PDF capture works. */
 export function VoucherPrintView({ content }: { content: React.ReactNode }) {
   const printed = useRef(false);
   useEffect(() => {
     if (printed.current) return;
     printed.current = true;
-    const t = setTimeout(() => {
+    const runPrint = () => {
       window.print();
-    }, 300);
+    };
+    const t = setTimeout(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          runPrint();
+        });
+      });
+    }, 500);
     return () => clearTimeout(t);
   }, []);
-  return <div className="min-h-screen bg-white p-6">{content}</div>;
+  return (
+    <div className="voucher-print-page min-h-screen w-full bg-white p-6">
+      {content}
+    </div>
+  );
 }
 
 export type VoucherDetailViewVariant = "page" | "dialog";
@@ -206,7 +251,6 @@ export function VoucherDetailView({
 
   const isPage = variant === "page";
   const canInvalidate = voucher.status === "issued";
-  const canDelete = true; // API will reject if redeemed
 
   return (
     <div className="space-y-6">

@@ -8,6 +8,7 @@ import type { Client } from "@/lib/types";
 import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
+import { PostcodeLookup } from "@/components/postcode-lookup";
 
 /** Client-like shape for form (create or edit). */
 type ClientFormClient = Pick<
@@ -139,16 +140,15 @@ export function CreateClientForm({
         </Label>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="create-client-postcode">Postcode</Label>
-        <Input
-          id="create-client-postcode"
-          value={postcode}
-          onChange={(e) => setPostcode(e.target.value)}
-          placeholder="e.g. NE6 3XH"
-          disabled={noFixedAddress || loading}
-        />
-      </div>
+      <PostcodeLookup
+        id="create-client-postcode"
+        label="Postcode"
+        value={postcode}
+        onChange={setPostcode}
+        onAddressSelect={(_pc, addressLine) => setAddress((prev) => addressLine || prev)}
+        disabled={noFixedAddress || loading}
+        placeholder="e.g. NE6 3XH"
+      />
 
       <div className="space-y-2">
         <Label htmlFor="create-client-address">Address (optional)</Label>
@@ -156,7 +156,7 @@ export function CreateClientForm({
           id="create-client-address"
           value={address}
           onChange={(e) => setAddress(e.target.value)}
-          placeholder="Full address if known"
+          placeholder="Full address or select from postcode lookup"
           disabled={loading}
         />
       </div>

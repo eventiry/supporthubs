@@ -30,7 +30,13 @@ export async function POST(request: Request) {
     await setPlatformRlsContext();
     const user = await db.user.findUnique({
       where: { email },
-      select: { id: true, status: true, firstName: true },
+      select: {
+        id: true,
+        status: true,
+        firstName: true,
+        organizationId: true,
+        organization: { select: { name: true, logoUrl: true } },
+      },
     });
 
     if (user && user.status === "ACTIVE") {
@@ -47,7 +53,9 @@ export async function POST(request: Request) {
         },
       });
 
-      await sendPasswordResetEmail(email, token, user.firstName);
+      const organizationName = user.organization?.name ?? undefined;
+      const logoUrl = user.organization?.logoUrl ?? undefined;
+      await sendPasswordResetEmail(email, token, user.firstName, organizationName, logoUrl);
     }
     // Same response whether or not account exists
     return NextResponse.json({

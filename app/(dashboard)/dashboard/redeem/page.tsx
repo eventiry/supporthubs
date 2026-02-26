@@ -32,6 +32,9 @@ export default function RedeemPage() {
   const [redeemError, setRedeemError] = useState<string | null>(null);
   const [redeemSuccess, setRedeemSuccess] = useState(false);
   const [searchFeedback, setSearchFeedback] = useState<string | null>(null);
+  const [unfulfilledReason, setUnfulfilledReason] = useState("");
+  const [unfulfilledLoading, setUnfulfilledLoading] = useState(false);
+  const [unfulfilledSuccess, setUnfulfilledSuccess] = useState(false);
 
   useEffect(() => {
     api.centers.list().then(setCenters).catch(() => {});
@@ -112,6 +115,7 @@ export default function RedeemPage() {
   async function selectVoucher(v: VoucherSummary) {
     setRedeemError(null);
     setRedeemSuccess(false);
+    setUnfulfilledSuccess(false);
     try {
       const detail = await api.vouchers.get(v.id);
       setSelectedVoucher(detail);
@@ -140,6 +144,26 @@ export default function RedeemPage() {
       setRedeemError(getErrorMessage(err));
     } finally {
       setRedeemLoading(false);
+    }
+  }
+
+  async function handleMarkUnfulfilled(e: React.FormEvent) {
+    e.preventDefault();
+    if (!selectedVoucher) return;
+    setRedeemError(null);
+    setUnfulfilledLoading(true);
+    try {
+      await api.vouchers.unfulfilled(selectedVoucher.id, {
+        reason: unfulfilledReason.trim() || undefined,
+      });
+      setUnfulfilledSuccess(true);
+      setSelectedVoucher(null);
+      setResults((prev) => prev.filter((r) => r.id !== selectedVoucher.id));
+      setUnfulfilledReason("");
+    } catch (err) {
+      setRedeemError(getErrorMessage(err));
+    } finally {
+      setUnfulfilledLoading(false);
     }
   }
 
@@ -250,6 +274,7 @@ export default function RedeemPage() {
           if (!open) {
             setSelectedVoucher(null);
             setRedeemError(null);
+            setUnfulfilledSuccess(false);
           }
         }}
       >
@@ -300,6 +325,10 @@ export default function RedeemPage() {
                   <p className="text-sm font-medium text-primary">
                     Voucher marked as fulfilled successfully.
                   </p>
+                ) : unfulfilledSuccess ? (
+                  <p className="text-sm font-medium text-primary">
+                    Voucher marked as unfulfilled.
+                  </p>
                 ) : new Date(selectedVoucher.expiryDate) < new Date() ? (
                   <p className="text-sm text-destructive">
                     This voucher has expired and cannot be redeemed.
@@ -325,24 +354,34 @@ export default function RedeemPage() {
                         ))}
                       </select>
                     </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="redeem-failureReason">Failure reason (optional)</Label>
-                      <Input
-                        id="redeem-failureReason"
-                        value={failureReason}
-                        onChange={(e) => setFailureReason(e.target.value)}
-                        placeholder="If redemption could not be completed"
-                      />
-                    </div>
                     {redeemError && (
                       <p className="text-sm text-destructive" role="alert">
                         {redeemError}
                       </p>
                     )}
-                    <div className="flex gap-2">
-                      <Button type="submit" disabled={redeemLoading}>
+                    <div className="">
+                      <Button type="submit" disabled={redeemLoading || unfulfilledLoading}>
                         {redeemLoading ? "Submitting…" : "Mark as fulfilled"}
                       </Button>
+                      <form onSubmit={handleMarkUnfulfilled} className="inline-flex flex-wrap gap-2 items-end">   
+                        <div className="space-y-2">
+                          <Label htmlFor="redeem-failureReason">Failure reason (optional)</Label>
+                          <Input
+                            id="redeem-failureReason"
+                            value={unfulfilledReason}
+                            onChange={(e) => setUnfulfilledReason(e.target.value)}
+                            placeholder="If redemption could not be completed"
+                            disabled={unfulfilledLoading || redeemLoading}
+                          />
+                        </div>
+                        <Button
+                          type="submit"
+                          variant="outline"
+                          disabled={unfulfilledLoading || redeemLoading}
+                        >
+                          {unfulfilledLoading ? "Marking…" : "Mark as unfulfilled"}
+                        </Button>                        
+                      </form>
                       <Button
                         type="button"
                         variant="outline"

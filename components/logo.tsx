@@ -25,8 +25,8 @@ import Link from "next/link";
 import logoImage from "./assets/logo.png";
 import iconImage from "./assets/icon.png";
 
-export function Logo({ isCollapsed = false, isAdmin = false, link = "/" }: { isCollapsed?: boolean, isAdmin?: boolean, link?: string }) {
- const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
+export function Logo({ isCollapsed = false, isAdmin: _isAdmin = false, link = "/" }: { isCollapsed?: boolean; isAdmin?: boolean; link?: string }) {
+  const webUrl = process.env.NEXT_PUBLIC_WEB_URL || "http://localhost:3000";
   return (
     <Link href={webUrl || link} className="flex items-center">
      {isCollapsed ? (

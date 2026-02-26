@@ -135,20 +135,44 @@ async function createUser(): Promise<void> {
   const lastName = await ask("Last name", DEFAULTS.user.lastName);
 
   const role = await pickOne("Role", [
-    { label: "admin", value: "admin" as const },
+    { label: "super_admin (platform – no organization)", value: "super_admin" as const },
+    { label: "admin (organization)", value: "admin" as const },
     { label: "third_party (referral)", value: "third_party" as const },
-    { label: "back_office", value: "back_office" as const },
+    { label: "back_office (organization)", value: "back_office" as const },
   ]);
 
+  let organizationId: string | null = null;
   let agencyId: string | null = null;
-  if (role === "third_party") {
-    const agencies = await prisma.agency.findMany({ select: { id: true, name: true } });
+
+  if (role === "super_admin") {
+    // Platform admin: no organization, no agency
+    organizationId = null;
+    agencyId = null;
+  } else if (role === "admin" || role === "back_office") {
+    // Organization-scoped: must pick an organization
+    const orgs = await prisma.organization.findMany({ select: { id: true, name: true, slug: true } });
+    if (orgs.length === 0) {
+      console.log("No organizations found. Create an organization first (e.g. via join flow or seed).");
+      return;
+    }
+    const chosen = await pickOne(
+      "Organization",
+      orgs.map((o) => ({ label: `${o.name} (${o.slug})`, value: o.id }))
+    );
+    organizationId = chosen;
+    agencyId = null;
+  } else if (role === "third_party") {
+    const agencies = await prisma.agency.findMany({
+      select: { id: true, name: true, organizationId: true },
+    });
     if (agencies.length > 0) {
       const chosen = await pickOne(
         "Agency",
         agencies.map((a) => ({ label: a.name, value: a.id }))
       );
       agencyId = chosen as string | null;
+      const agency = agencies.find((a) => a.id === agencyId);
+      organizationId = agency?.organizationId ?? null;
     } else {
       console.log("No agencies found. Create an agency first or leave user without agency.");
     }
@@ -162,11 +186,12 @@ async function createUser(): Promise<void> {
       firstName,
       lastName,
       role,
+      organizationId,
       agencyId,
       status: "ACTIVE",
     },
   });
-  console.log("Created User:", created.id, created.email);
+  console.log("Created User:", created.id, created.email, `(${role})`);
 }
 
 async function createClient(): Promise<void> {

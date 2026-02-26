@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
 import { useRbac } from "@/lib/hooks/use-rbac";
@@ -26,7 +25,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/dialog";
+import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/alert-dialog";
 import { Loading } from "@/components/ui/loading";
+import { Trash2 } from "lucide-react";
 
 export default function UsersPage() {
   const { hasPermission, isLoading: rbacLoading } = useRbac();
@@ -59,6 +68,10 @@ export default function UsersPage() {
   const [addAgencyEmail, setAddAgencyEmail] = useState("");
   const [addAgencyLoading, setAddAgencyLoading] = useState(false);
   const [addAgencyError, setAddAgencyError] = useState<string | null>(null);
+
+  const [removeUser, setRemoveUser] = useState<UserListItem | null>(null);
+  const [removeLoading, setRemoveLoading] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   const userDialogOpen = showCreate || !!editUser;
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,6 +218,21 @@ export default function UsersPage() {
       setEditError(getErrorMessage(err));
     } finally {
       setEditLoading(false);
+    }
+  }
+
+  async function handleRemoveUser() {
+    if (!removeUser) return;
+    setRemoveError(null);
+    setRemoveLoading(true);
+    try {
+      await api.users.disable(removeUser.id);
+      setUsers((prev) => prev.filter((u) => u.id !== removeUser.id));
+      setRemoveUser(null);
+    } catch (err) {
+      setRemoveError(getErrorMessage(err));
+    } finally {
+      setRemoveLoading(false);
     }
   }
 
@@ -531,13 +559,29 @@ export default function UsersPage() {
                     </TableCell>
                     <TableCell className="capitalize">{u.status.toLowerCase()}</TableCell>
                     <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => openEdit(u)}
-                      >
-                        Edit
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {canManage && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => openEdit(u)}
+                            >
+                              Edit
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => setRemoveUser(u)}
+                              title="Remove user"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -546,6 +590,34 @@ export default function UsersPage() {
           )}
         </CardContent>
       </Card>
+      <AlertDialog open={!!removeUser} onOpenChange={(open) => !open && (setRemoveUser(null), setRemoveError(null))}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {removeUser
+                ? `"${removeUser.firstName} ${removeUser.lastName}" (${removeUser.email}) will be removed. They will no longer be able to sign in. This cannot be undone.`
+                : ""}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {removeError && (
+            <p className="text-sm text-destructive" role="alert">
+              {removeError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={removeLoading}>Cancel</AlertDialogCancel>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={() => void handleRemoveUser()}
+              disabled={removeLoading}
+            >
+              {removeLoading ? "Removing…" : "Remove user"}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Dialog open={addAgencyDialogOpen} onOpenChange={setAddAgencyDialogOpen}>
         <DialogContent>
           <DialogHeader>

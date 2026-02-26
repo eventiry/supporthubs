@@ -38,7 +38,7 @@ export function NotificationProvider({
   const [unreadCount, setUnreadCount] = useState(0)
   const [notifications, setNotifications] = useState<Notification[]>([])
 
-  const { isConnected, notifications: sseNotifications } = useNotificationSSE({
+  const { isConnected, notifications: _sseNotifications } = useNotificationSSE({
     enabled,
     onNotification: (notification) => {
       // Add to notifications list

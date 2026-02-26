@@ -57,8 +57,7 @@ export function ServiceReviewForm({ bookingId, serviceId, onSubmit, onCancel }: 
       // Upload images using the unified service upload endpoint
       const { api } = await import("@ordafy/api")
       const result = await api.upload.service(fileArray)
-      const urls = result.urls
-      
+
       // Add uploaded URLs to images
       setImages((prev) => [...prev, ...result.urls])
       setUploading(false)

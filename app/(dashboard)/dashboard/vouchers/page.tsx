@@ -44,15 +44,16 @@ export default function VouchersPage() {
   const canRedeem = hasPermission(Permission.VOUCHER_REDEEM);
 
   useEffect(() => {
-    const params: { status?: "issued" | "redeemed" | "expired"; validity?: "valid" | "expired" } = {};
+    const params: { status?: "issued" | "redeemed" | "expired" | "unfulfilled"; validity?: "valid" | "expired" } = {};
     if (validityFilter === "valid" || validityFilter === "expired") {
       params.validity = validityFilter as "valid" | "expired";
     } else if (
       statusFilter === "issued" ||
       statusFilter === "redeemed" ||
-      statusFilter === "expired"
+      statusFilter === "expired" ||
+      statusFilter === "unfulfilled"
     ) {
-      params.status = statusFilter as "issued" | "redeemed" | "expired";
+      params.status = statusFilter as "issued" | "redeemed" | "expired" | "unfulfilled";
     }
     const hasParams = Object.keys(params).length > 0;
     setLoading(true);
@@ -90,15 +91,16 @@ export default function VouchersPage() {
   const handleDetailInvalidated = () => {
     closeDetail();
     setLoading(true);
-    const params: { status?: "issued" | "redeemed" | "expired"; validity?: "valid" | "expired" } = {};
+    const params: { status?: "issued" | "redeemed" | "expired" | "unfulfilled"; validity?: "valid" | "expired" } = {};
     if (validityFilter === "valid" || validityFilter === "expired") {
       params.validity = validityFilter as "valid" | "expired";
     } else if (
       statusFilter === "issued" ||
       statusFilter === "redeemed" ||
-      statusFilter === "expired"
+      statusFilter === "expired" ||
+      statusFilter === "unfulfilled"
     ) {
-      params.status = statusFilter as "issued" | "redeemed" | "expired";
+      params.status = statusFilter as "issued" | "redeemed" | "expired" | "unfulfilled";
     }
     api.vouchers
       .list(Object.keys(params).length > 0 ? params : undefined)
@@ -110,15 +112,16 @@ export default function VouchersPage() {
   const handleDetailDeleted = () => {
     closeDetail();
     setLoading(true);
-    const params: { status?: "issued" | "redeemed" | "expired"; validity?: "valid" | "expired" } = {};
+    const params: { status?: "issued" | "redeemed" | "expired" | "unfulfilled"; validity?: "valid" | "expired" } = {};
     if (validityFilter === "valid" || validityFilter === "expired") {
       params.validity = validityFilter as "valid" | "expired";
     } else if (
       statusFilter === "issued" ||
       statusFilter === "redeemed" ||
-      statusFilter === "expired"
+      statusFilter === "expired" ||
+      statusFilter === "unfulfilled"
     ) {
-      params.status = statusFilter as "issued" | "redeemed" | "expired";
+      params.status = statusFilter as "issued" | "redeemed" | "expired" | "unfulfilled";
     }
     api.vouchers
       .list(Object.keys(params).length > 0 ? params : undefined)
@@ -177,6 +180,7 @@ export default function VouchersPage() {
               <option value="issued">Issued</option>
               <option value="redeemed">Redeemed</option>
               <option value="expired">Expired</option>
+              <option value="unfulfilled">Unfulfilled</option>
             </select>
           </div>
         </CardHeader>

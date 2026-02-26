@@ -174,6 +174,8 @@ export interface FoodBankCenterCreatePayload {
   postcode?: string;
   phone?: string;
   email?: string;
+  /** e.g. { "Mon": "10:00-11:30", "Thu": "10:00-13:00" } */
+  openingHours?: Record<string, string> | null;
   canDeliver?: boolean;
 }
 
@@ -183,6 +185,7 @@ export interface FoodBankCenterUpdatePayload {
   postcode?: string | null;
   phone?: string | null;
   email?: string | null;
+  openingHours?: Record<string, string> | null;
   canDeliver?: boolean;
 }
 
@@ -529,8 +532,10 @@ export interface VoucherDetail {
   >;
   foodBankCenter: Pick<
     FoodBankCenter,
-    "id" | "name" | "address" | "postcode" | "phone" | "email" | "canDeliver"
+    "id" | "name" | "address" | "postcode" | "phone" | "email" | "openingHours" | "canDeliver"
   > | null;
+  issuedBy?: { firstName: string; lastName: string };
+  organization?: { logoUrl: string | null; name: string };
 }
 
 // ----- Redemption -----

@@ -73,8 +73,15 @@ export async function GET(
           postcode: true,
           phone: true,
           email: true,
+          openingHours: true,
           canDeliver: true,
         },
+      },
+      issuedBy: {
+        select: { firstName: true, lastName: true },
+      },
+      organization: {
+        select: { logoUrl: true, name: true },
       },
     },
   });
@@ -102,6 +109,8 @@ export async function GET(
     agency: voucher.agency,
     referralDetails: voucher.referralDetails,
     foodBankCenter: voucher.foodBankCenter,
+    issuedBy: voucher.issuedBy,
+    organization: voucher.organization,
   });
 }
 
