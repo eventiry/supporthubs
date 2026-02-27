@@ -192,6 +192,39 @@ export async function POST(req: NextRequest) {
       ? (payload.householdChild as Record<string, number>)
       : null;
 
+  const yearOfBirthVal = yearOfBirth != null && !Number.isNaN(yearOfBirth) ? yearOfBirth : null;
+  const postcodeNormalized =
+    noFixedAddress || !postcode?.trim()
+      ? null
+      : postcode!.trim().toUpperCase().replace(/\s+/g, "");
+
+  const candidates = await db.client.findMany({
+    where: {
+      organizationId: tenant.organizationId,
+      surname: { equals: surname, mode: "insensitive" },
+      yearOfBirth: yearOfBirthVal,
+      ...(postcodeNormalized == null ? { postcode: null } : {}),
+    },
+    select: { id: true, firstName: true, surname: true, postcode: true },
+  });
+
+  const normalize = (pc: string | null) =>
+    pc == null || pc.trim() === "" ? null : pc.trim().toUpperCase().replace(/\s+/g, "");
+  const existing =
+    postcodeNormalized == null
+      ? candidates.find((c) => c.postcode == null) ?? null
+      : candidates.find((c) => normalize(c.postcode) === postcodeNormalized) ?? null;
+
+  if (existing) {
+    return NextResponse.json(
+      {
+        message:
+          "A client with this surname, postcode and year of birth already exists. Use search to find them or use a different combination.",
+      },
+      { status: 409 }
+    );
+  }
+
   const client = await db.client.create({
     data: {
       firstName,
@@ -200,7 +233,7 @@ export async function POST(req: NextRequest) {
       postcode: noFixedAddress ? null : (postcode ?? null),
       noFixedAddress,
       address,
-      yearOfBirth: yearOfBirth != null && !Number.isNaN(yearOfBirth) ? yearOfBirth : null,
+      yearOfBirth: yearOfBirthVal,
       householdAdults: householdAdults ?? undefined,
       householdChild: householdChild ?? undefined,
     },

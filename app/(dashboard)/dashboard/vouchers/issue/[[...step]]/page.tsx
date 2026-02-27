@@ -172,6 +172,7 @@ export default function IssueVoucherWizardPage() {
   const [agencyId, setAgencyId] = useState("");
   const [foodBankCenterId, setFoodBankCenterId] = useState("");
   const [collectionNotes, setCollectionNotes] = useState("");
+  const [weightKg, setWeightKg] = useState<string>("");
   const [issueDate, setIssueDate] = useState("");
   const [expiryDate, setExpiryDate] = useState("");
   const [vouchersInLast6Months, setVouchersInLast6Months] = useState(0);
@@ -384,6 +385,10 @@ export default function IssueVoucherWizardPage() {
         expiryDate: expiryForPayload,
         foodBankCenterId: foodBankCenterId || undefined,
         collectionNotes: selectedOrgsRules ? undefined : (collectionNotes.trim() || undefined),
+        weightKg: (() => {
+          const n = weightKg.trim() ? parseFloat(weightKg) : NaN;
+          return typeof n === "number" && !Number.isNaN(n) && n >= 0 ? n : undefined;
+        })(),
       });
       setCreatedVoucherId(v.id);
       setCreatedCode(v.code);
@@ -1154,6 +1159,17 @@ export default function IssueVoucherWizardPage() {
                 )}
               </div>
             </div>
+            <div className="space-y-2">
+              <Label>Weight (kg) — optional</Label>
+              <Input
+                type="number"
+                min={0}
+                step={0.1}
+                placeholder="e.g. 12.5"
+                value={weightKg}
+                onChange={(e) => setWeightKg(e.target.value)}
+              />
+            </div>
             {/* {!selectedOrgsRules && ( */}
               <div className="space-y-2">
                 <Label>Collection notes (optional)</Label>
@@ -1199,6 +1215,9 @@ export default function IssueVoucherWizardPage() {
                   <p><span className="font-medium text-muted-foreground">Client:</span> {selectedClient?.firstName} {selectedClient?.surname}</p>
                   <p><span className="font-medium text-muted-foreground">Agency:</span> {agencies.find((a) => a.id === agencyId)?.name}</p>
                   <p><span className="font-medium text-muted-foreground">Centre:</span> {centers.find((c) => c.id === foodBankCenterId)?.name}</p>
+                  {weightKg.trim() && !Number.isNaN(parseFloat(weightKg)) && (
+                    <p><span className="font-medium text-muted-foreground">Weight (kg):</span> {weightKg}</p>
+                  )}
                   {referral.notes && <p><span className="font-medium text-muted-foreground">Notes:</span> {referral.notes}</p>}
                   {referral.incomeSource && <p><span className="font-medium text-muted-foreground">Income source:</span> {referral.incomeSource}</p>}
                   {referral.dietaryRequirements && <p><span className="font-medium text-muted-foreground">Dietary:</span> {referral.dietaryRequirements}</p>}
@@ -1224,10 +1243,13 @@ export default function IssueVoucherWizardPage() {
                     <p><span className="font-medium text-muted-foreground">Centre:</span> {centers.find((c) => c.id === foodBankCenterId)?.name}</p>
                     <p><span className="font-medium text-muted-foreground">Issue:</span> {formatDate(issueDate)} — <span className="font-medium text-muted-foreground">Expiry:</span> {selectedOrgsRules ? (() => { const d = new Date(issueDate); d.setDate(d.getDate() + 7); return formatDate(d.toISOString().slice(0, 10)); })() : formatDate(expiryDate)}
                     </p>
+                    {weightKg.trim() && !Number.isNaN(parseFloat(weightKg)) && (
+                      <p><span className="font-medium text-muted-foreground">Weight (kg):</span> {weightKg}</p>
+                    )}
                   </section>
                   <section className="rounded-md border bg-muted/30 p-3 space-y-1">
                     <p className="font-medium text-muted-foreground mb-1">Referral details</p>
-                    <p><span className="font-medium text-muted-foreground">Notes:</span> {referral.notes || "—"}</p>
+                    {!selectedOrgsRules && <p><span className="font-medium text-muted-foreground">Notes:</span> {referral.notes || "—"}</p>}
                     {referral.incomeSource && <p><span className="font-medium text-muted-foreground">Income source:</span> {referral.incomeSource}</p>}
                     {vouchersInLast6Months >= 3 && referral.moreThan3VouchersReason && (
                       <p><span className="font-medium text-muted-foreground">Reason for 3+ vouchers:</span> {referral.moreThan3VouchersReason}</p>

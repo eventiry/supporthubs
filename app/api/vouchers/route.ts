@@ -157,6 +157,8 @@ export async function POST(req: NextRequest) {
     typeof payload.foodBankCenterId === "string" ? payload.foodBankCenterId.trim() || undefined : undefined;
   const collectionNotes =
     typeof payload.collectionNotes === "string" ? payload.collectionNotes.trim() || undefined : undefined;
+  const weightKg =
+    typeof payload.weightKg === "number" && payload.weightKg >= 0 ? payload.weightKg : undefined;
 
   const selectedOrgsRules = isOrgInSelectedOrgs(tenant.organizationId);
   const requireExpiry = !selectedOrgsRules;
@@ -298,6 +300,7 @@ export async function POST(req: NextRequest) {
       expiryDate,
       issuedById: user.id,
       collectionNotes: selectedOrgsRules ? undefined : collectionNotes,
+      weightKg: weightKg ?? undefined,
     },
     include: {
       client: { select: { firstName: true, surname: true } },

@@ -17,6 +17,21 @@ import {
   DialogDescription,
 } from "@/components/dialog";
 
+function formatHouseholdByAge(householdByAge: unknown): string {
+  if (householdByAge == null || typeof householdByAge !== "object") return "—";
+  const obj = householdByAge as Record<string, number>;
+  const parts = Object.entries(obj)
+    .filter(([, n]) => n != null && Number(n) > 0)
+    .map(([label, n]) => `${label}: ${n}`);
+  return parts.length ? parts.join(", ") : "—";
+}
+
+function totalPeopleFromHousehold(householdByAge: unknown): number {
+  if (householdByAge == null || typeof householdByAge !== "object") return 0;
+  const obj = householdByAge as Record<string, number>;
+  return Object.values(obj).reduce((sum, n) => sum + (typeof n === "number" && n > 0 ? n : 0), 0);
+}
+
 export default function RedeemPage() {
   const [codeInput, setCodeInput] = useState("");
   const [fromDate, setFromDate] = useState("");
@@ -27,6 +42,7 @@ export default function RedeemPage() {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherDetail | null>(null);
   const [centers, setCenters] = useState<FoodBankCenter[]>([]);
   const [centerId, setCenterId] = useState("");
+  const [fulfillmentWeightKg, setFulfillmentWeightKg] = useState("");
   const [failureReason, setFailureReason] = useState("");
   const [redeemLoading, setRedeemLoading] = useState(false);
   const [redeemError, setRedeemError] = useState<string | null>(null);
@@ -119,6 +135,11 @@ export default function RedeemPage() {
     try {
       const detail = await api.vouchers.get(v.id);
       setSelectedVoucher(detail);
+      // Pre-select the food bank centre assigned at issue (if any)
+      setCenterId(detail.foodBankCenter?.id ?? "");
+      setFulfillmentWeightKg("");
+      setFailureReason("");
+      setUnfulfilledReason("");
     } catch (err) {
       setSearchError(getErrorMessage(err));
       setSelectedVoucher(null);
@@ -131,14 +152,24 @@ export default function RedeemPage() {
     setRedeemError(null);
     setRedeemLoading(true);
     try {
+      const weightKgVal = fulfillmentWeightKg.trim()
+        ? parseFloat(fulfillmentWeightKg)
+        : undefined;
       await api.vouchers.redeem(selectedVoucher.id, {
         centerId,
         failureReason: failureReason.trim() || undefined,
+        weightKg:
+          weightKgVal != null &&
+          !Number.isNaN(weightKgVal) &&
+          weightKgVal >= 0
+            ? weightKgVal
+            : undefined,
       });
       setRedeemSuccess(true);
       setSelectedVoucher(null);
       setResults((prev) => prev.filter((r) => r.id !== selectedVoucher.id));
       setCenterId("");
+      setFulfillmentWeightKg("");
       setFailureReason("");
     } catch (err) {
       setRedeemError(getErrorMessage(err));
@@ -287,39 +318,106 @@ export default function RedeemPage() {
                   <span className="font-mono text-foreground">{selectedVoucher.code}</span>
                 </DialogDescription>
               </DialogHeader>
-              <div className="space-y-4">
-                <section>
-                  <h3 className="text-sm font-medium text-muted-foreground">Client</h3>
-                  <p>
-                    {selectedVoucher.client.firstName} {selectedVoucher.client.surname}
-                  </p>
-                </section>
-                <section>
-                  <h3 className="text-sm font-medium text-muted-foreground">
-                    Reason for referral
-                  </h3>
-                  <p className="whitespace-pre-wrap text-sm">
-                    {selectedVoucher.referralDetails.notes}
-                  </p>
-                </section>
-                {(selectedVoucher.referralDetails.dietaryRequirements ||
-                  selectedVoucher.referralDetails.parcelNotes) && (
+              <div className="space-y-4 pr-1">
+                {/* Comprehensive voucher details (as issued) */}
+                <div className="rounded-lg border bg-muted/20 p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-foreground">Details from issue</h3>
                   <section>
-                    <h3 className="text-sm font-medium text-muted-foreground">
-                      Dietary / parcel notes
-                    </h3>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Client</h4>
+                    <p className="text-sm font-medium">
+                      {selectedVoucher.client.firstName} {selectedVoucher.client.surname}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {selectedVoucher.client.noFixedAddress
+                        ? "No fixed address"
+                        : selectedVoucher.client.postcode ?? "—"}
+                    </p>
+                  </section>
+                  <section>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Agency</h4>
+                    <p className="text-sm">{selectedVoucher.agency.name}</p>
+                  </section>
+                  <section>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Dates</h4>
+                    <p className="text-sm">
+                      Issued {formatDate(selectedVoucher.issueDate)} · Expires {formatDate(selectedVoucher.expiryDate)}
+                    </p>
+                  </section>
+                  {selectedVoucher.weightKg != null && (
+                    <section>
+                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Weight at issue</h4>
+                      <p className="text-sm">{selectedVoucher.weightKg} kg</p>
+                    </section>
+                  )}
+                  {selectedVoucher.collectionNotes && (
+                    <section>
+                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Collection notes</h4>
+                      <p className="text-sm whitespace-pre-wrap">{selectedVoucher.collectionNotes}</p>
+                    </section>
+                  )}
+                  <section>
+                    <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Referral details</h4>
+                    <p className="text-sm whitespace-pre-wrap">{selectedVoucher.referralDetails.notes}</p>
+                    {selectedVoucher.referralDetails.referralReasons != null &&
+                      typeof selectedVoucher.referralDetails.referralReasons === "object" && (
+                        <p className="text-sm mt-1">
+                          <span className="text-muted-foreground">Reasons:</span>{" "}
+                          {Array.isArray(selectedVoucher.referralDetails.referralReasons)
+                            ? (selectedVoucher.referralDetails.referralReasons as string[]).join(", ")
+                            : String(selectedVoucher.referralDetails.referralReasons)}
+                        </p>
+                      )}
+                    {selectedVoucher.referralDetails.householdByAge != null &&
+                      typeof selectedVoucher.referralDetails.householdByAge === "object" && (
+                        <>
+                          <p className="text-sm mt-1">
+                            <span className="text-muted-foreground">People (by age):</span>{" "}
+                            {formatHouseholdByAge(selectedVoucher.referralDetails.householdByAge)}
+                          </p>
+                          {totalPeopleFromHousehold(selectedVoucher.referralDetails.householdByAge) > 0 && (
+                            <p className="text-sm">
+                              <span className="text-muted-foreground">Total people:</span>{" "}
+                              {totalPeopleFromHousehold(selectedVoucher.referralDetails.householdByAge)}
+                            </p>
+                          )}
+                        </>
+                      )}
+                    {selectedVoucher.referralDetails.incomeSource && (
+                      <p className="text-sm mt-1">
+                        <span className="text-muted-foreground">Income source:</span> {selectedVoucher.referralDetails.incomeSource}
+                      </p>
+                    )}
+                    {selectedVoucher.referralDetails.moreThan3VouchersReason && (
+                      <p className="text-sm mt-1">
+                        <span className="text-muted-foreground">Reason for 3+ vouchers:</span> {selectedVoucher.referralDetails.moreThan3VouchersReason}
+                      </p>
+                    )}
                     {selectedVoucher.referralDetails.dietaryRequirements && (
-                      <p className="text-sm">
-                        Dietary: {selectedVoucher.referralDetails.dietaryRequirements}
+                      <p className="text-sm mt-1">
+                        <span className="text-muted-foreground">Dietary:</span> {selectedVoucher.referralDetails.dietaryRequirements}
+                      </p>
+                    )}
+                    {selectedVoucher.referralDetails.ethnicGroup && (
+                      <p className="text-sm mt-1">
+                        <span className="text-muted-foreground">Ethnic group:</span> {selectedVoucher.referralDetails.ethnicGroup}
                       </p>
                     )}
                     {selectedVoucher.referralDetails.parcelNotes && (
-                      <p className="text-sm">
-                        Parcel: {selectedVoucher.referralDetails.parcelNotes}
+                      <p className="text-sm mt-1">
+                        <span className="text-muted-foreground">Parcel notes:</span> {selectedVoucher.referralDetails.parcelNotes}
                       </p>
                     )}
                   </section>
-                )}
+                  {selectedVoucher.foodBankCenter && (
+                    <section>
+                      <h4 className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Assigned food bank centre (at issue)</h4>
+                      <p className="text-sm font-medium">{selectedVoucher.foodBankCenter.name}</p>
+                      {selectedVoucher.foodBankCenter.address && (
+                        <p className="text-xs text-muted-foreground">{selectedVoucher.foodBankCenter.address}</p>
+                      )}
+                    </section>
+                  )}
+                </div>
 
                 {redeemSuccess ? (
                   <p className="text-sm font-medium text-primary">
@@ -334,43 +432,73 @@ export default function RedeemPage() {
                     This voucher has expired and cannot be redeemed.
                   </p>
                 ) : (
-                  <form onSubmit={handleMarkFulfilled} className="space-y-4 border-t pt-4">
-                    <h3 className="text-sm font-medium">Mark as fulfilled</h3>
-                    <div className="space-y-2">
-                      <Label htmlFor="redeem-center">Food bank centre *</Label>
-                      <select
-                        id="redeem-center"
-                        className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
-                        value={centerId}
-                        onChange={(e) => setCenterId(e.target.value)}
-                        required
-                      >
-                        <option value="">Select centre</option>
-                        {centers.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                            {c.address ? ` — ${c.address}` : ""}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div className="space-y-5 border-t pt-4">
                     {redeemError && (
                       <p className="text-sm text-destructive" role="alert">
                         {redeemError}
                       </p>
                     )}
-                    <div className="">
-                      <Button type="submit" disabled={redeemLoading || unfulfilledLoading}>
+
+                    <form onSubmit={handleMarkFulfilled} className="space-y-4 rounded-lg border border-border bg-background p-4">
+                      <h3 className="text-sm font-semibold">Mark as fulfilled</h3>
+                      <div className="space-y-2">
+                        <Label htmlFor="redeem-center">Food bank centre where fulfilled *</Label>
+                        <select
+                          id="redeem-center"
+                          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+                          value={centerId}
+                          onChange={(e) => setCenterId(e.target.value)}
+                          required
+                        >
+                          <option value="">Select centre</option>
+                          {selectedVoucher.foodBankCenter && (
+                            <option value={selectedVoucher.foodBankCenter.id}>
+                              {selectedVoucher.foodBankCenter.name}
+                              {selectedVoucher.foodBankCenter.address ? ` — ${selectedVoucher.foodBankCenter.address}` : ""}
+                              {" — Assigned at issue"}
+                            </option>
+                          )}
+                          {centers
+                            .filter((c) => c.id !== selectedVoucher.foodBankCenter?.id)
+                            .map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                                {c.address ? ` — ${c.address}` : ""}
+                              </option>
+                            ))}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="redeem-weightKg">Fulfillment weight (kg, optional)</Label>
+                        <Input
+                          id="redeem-weightKg"
+                          type="number"
+                          min={0}
+                          step={0.1}
+                          placeholder={selectedVoucher.weightKg != null ? `Override: e.g. ${selectedVoucher.weightKg}` : "Actual weight at collection"}
+                          value={fulfillmentWeightKg}
+                          onChange={(e) => setFulfillmentWeightKg(e.target.value)}
+                          disabled={redeemLoading || unfulfilledLoading}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Leave blank to use weight as issued, or enter actual weight at fulfillment.
+                        </p>
+                      </div>
+                      <Button type="submit" disabled={redeemLoading || unfulfilledLoading} className="w-full sm:w-auto">
                         {redeemLoading ? "Submitting…" : "Mark as fulfilled"}
                       </Button>
-                      <form onSubmit={handleMarkUnfulfilled} className="inline-flex flex-wrap gap-2 items-end">   
-                        <div className="space-y-2">
+                    </form>
+
+                    <div className="rounded-lg border border-border bg-muted/10 p-4 space-y-3">
+                      <h3 className="text-sm font-semibold text-muted-foreground">Unable to fulfill?</h3>
+                      <form onSubmit={handleMarkUnfulfilled} className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+                        <div className="space-y-2 flex-1 min-w-0">
                           <Label htmlFor="redeem-failureReason">Failure reason (optional)</Label>
                           <Input
                             id="redeem-failureReason"
                             value={unfulfilledReason}
                             onChange={(e) => setUnfulfilledReason(e.target.value)}
-                            placeholder="If redemption could not be completed"
+                            placeholder="e.g. Client did not attend"
                             disabled={unfulfilledLoading || redeemLoading}
                           />
                         </div>
@@ -378,10 +506,14 @@ export default function RedeemPage() {
                           type="submit"
                           variant="outline"
                           disabled={unfulfilledLoading || redeemLoading}
+                          className="sm:shrink-0"
                         >
                           {unfulfilledLoading ? "Marking…" : "Mark as unfulfilled"}
-                        </Button>                        
+                        </Button>
                       </form>
+                    </div>
+
+                    <div className="flex justify-end pt-2">
                       <Button
                         type="button"
                         variant="outline"
@@ -390,10 +522,10 @@ export default function RedeemPage() {
                           setRedeemError(null);
                         }}
                       >
-                        Cancel
+                        Close
                       </Button>
                     </div>
-                  </form>
+                  </div>
                 )}
               </div>
             </>

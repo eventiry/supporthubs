@@ -50,6 +50,7 @@ export const userCreateSchema = z.object({
 export const redeemPayloadSchema = z.object({
   centerId: z.string().min(1, "centerId is required"),
   failureReason: z.string().optional(),
+  weightKg: z.number().min(0).optional(),
 });
 
 export const userUpdateSchema = z.object({

@@ -9,7 +9,7 @@ import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
 
 /**
  * POST /api/vouchers/[id]/redeem
- * Body: { centerId: string, failureReason?: string }
+ * Body: { centerId: string, failureReason?: string, weightKg?: number }
  * Validates voucher exists, status = issued, not expired.
  * Creates Redemption, sets voucher status to redeemed.
  * Requires VOUCHER_REDEEM.
@@ -61,7 +61,7 @@ export async function POST(
     const msg = parsed.error.errors[0]?.message ?? "Validation failed";
     return NextResponse.json({ message: msg }, { status: 400 });
   }
-  const { centerId, failureReason } = parsed.data;
+  const { centerId, failureReason, weightKg } = parsed.data;
 
   const center = await db.foodBankCenter.findUnique({
     where: { id: centerId, organizationId: tenant.organizationId },
@@ -87,6 +87,8 @@ export async function POST(
         redeemedById: user.id,
         centerId,
         failureReason,
+        weightKg:
+          typeof weightKg === "number" && weightKg >= 0 ? weightKg : undefined,
       },
     }),
   ]);
@@ -97,7 +99,11 @@ export async function POST(
     action: AuditAction.REDEEM_VOUCHER,
     entity: "Voucher",
     entityId: voucherId,
-    changes: { centerId, failureReason: failureReason ?? null },
+    changes: {
+      centerId,
+      failureReason: failureReason ?? null,
+      weightKg: weightKg ?? null,
+    },
   });
 
   const summary = {
@@ -121,6 +127,7 @@ export async function POST(
       redeemedById: redemption.redeemedById,
       centerId: redemption.centerId,
       failureReason: redemption.failureReason,
+      weightKg: redemption.weightKg ?? undefined,
     },
   });
 }

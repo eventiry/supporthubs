@@ -31,6 +31,13 @@ function formatHouseholdByAge(householdByAge: unknown): string {
   return parts.length ? parts.join(", ") : "—";
 }
 
+/** Sum people from householdByAge. */
+function totalPeopleFromHousehold(householdByAge: unknown): number {
+  if (householdByAge == null || typeof householdByAge !== "object") return 0;
+  const obj = householdByAge as Record<string, number>;
+  return Object.values(obj).reduce((sum, n) => sum + (typeof n === "number" && n > 0 ? n : 0), 0);
+}
+
 /** Format openingHours for print (e.g. { "Mon": "10:00-11:30" } → "Mon: 10:00-11:30"). */
 function formatOpeningHours(openingHours: unknown): string {
   if (openingHours == null || typeof openingHours !== "object") return "";
@@ -65,6 +72,9 @@ export function VoucherPrintContent({ voucher }: { voucher: VoucherDetail }) {
           Please take this voucher to the selected food bank centre, ideally within 7 days.
         </p>
         <p className="mt-2 font-mono text-xl font-bold">Voucher code: {voucher.code}</p>
+        {voucher.weightKg != null && (
+          <p className="mt-1 text-sm"><span className="font-medium">Weight (kg):</span> {voucher.weightKg}</p>
+        )}
       </div>
 
       <section className="grid grid-cols-1 gap-x-8 gap-y-1 text-sm sm:grid-cols-2">
@@ -325,6 +335,30 @@ export function VoucherDetailView({
             <h3 className="text-sm font-medium text-muted-foreground">Agency</h3>
             <p>{voucher.agency.name}</p>
           </section>
+
+          {(voucher.weightKg != null || voucher.redemption?.weightKg != null) && (
+            <section>
+              <h3 className="text-sm font-medium text-muted-foreground">Weight</h3>
+              {voucher.weightKg != null && (
+                <p className="text-sm">
+                  <span className="text-muted-foreground">At issue:</span> {voucher.weightKg} kg
+                </p>
+              )}
+              {voucher.redemption?.weightKg != null && (
+                <p className="text-sm mt-1">
+                  <span className="text-muted-foreground">Fulfillment (at redeem):</span> {voucher.redemption.weightKg} kg
+                </p>
+              )}
+            </section>
+          )}
+
+          {voucher.collectionNotes && (
+            <section>
+              <h3 className="text-sm font-medium text-muted-foreground">Collection notes</h3>
+              <p className="whitespace-pre-wrap text-sm">{voucher.collectionNotes}</p>
+            </section>
+          )}
+
           <section>
             <h3 className="text-sm font-medium text-muted-foreground">
               Referral details
@@ -332,6 +366,30 @@ export function VoucherDetailView({
             <p className="whitespace-pre-wrap text-sm">
               {voucher.referralDetails.notes}
             </p>
+            {voucher.referralDetails.referralReasons != null &&
+              typeof voucher.referralDetails.referralReasons === "object" && (
+                <p className="mt-1 text-sm">
+                  <span className="text-muted-foreground">Reasons for referral:</span>{" "}
+                  {Array.isArray(voucher.referralDetails.referralReasons)
+                    ? (voucher.referralDetails.referralReasons as string[]).join(", ")
+                    : String(voucher.referralDetails.referralReasons)}
+                </p>
+              )}
+            {voucher.referralDetails.householdByAge != null &&
+              typeof voucher.referralDetails.householdByAge === "object" && (
+                <>
+                  <p className="mt-1 text-sm">
+                    <span className="text-muted-foreground">Number of people (by age):</span>{" "}
+                    {formatHouseholdByAge(voucher.referralDetails.householdByAge)}
+                  </p>
+                  {totalPeopleFromHousehold(voucher.referralDetails.householdByAge) > 0 && (
+                    <p className="mt-0.5 text-sm">
+                      <span className="text-muted-foreground">Total people:</span>{" "}
+                      {totalPeopleFromHousehold(voucher.referralDetails.householdByAge)}
+                    </p>
+                  )}
+                </>
+              )}
             {voucher.referralDetails.incomeSource && (
               <p className="mt-1 text-sm">
                 <span className="text-muted-foreground">Income source:</span> {voucher.referralDetails.incomeSource}

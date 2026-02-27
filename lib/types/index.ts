@@ -488,6 +488,8 @@ export interface VoucherCreatePayload {
   issueDate: string; // ISO date
   expiryDate: string; // ISO date
   collectionNotes?: string;
+  /** Parcel weight at issue (kg). */
+  weightKg?: number;
 }
 
 export interface VoucherSummary {
@@ -514,6 +516,7 @@ export interface VoucherDetail {
   expiryDate: Date;
   status: VoucherStatus;
   collectionNotes: string | null;
+  weightKg: number | null;
   client: Pick<Client, "id" | "firstName" | "surname" | "postcode" | "noFixedAddress" | "address">;
   agency: Pick<Agency, "id" | "name" | "contactPhone" | "contactEmail">;
   referralDetails: Pick<
@@ -536,13 +539,8 @@ export interface VoucherDetail {
   > | null;
   issuedBy?: { firstName: string; lastName: string };
   organization?: { logoUrl: string | null; name: string };
-}
-
-// ----- Redemption -----
-
-export interface RedemptionPayload {
-  centerId: string;
-  failureReason?: string;
+  /** Latest redemption when status is redeemed (for print / redeemed-at info). */
+  redemption?: RedemptionRecord | null;
 }
 
 export interface RedemptionRecord {
@@ -552,6 +550,17 @@ export interface RedemptionRecord {
   redeemedById: string;
   centerId: string;
   failureReason: string | null;
+  /** Fulfillment weight (kg) if overridden at redeem */
+  weightKg?: number | null;
+}
+
+// ----- Redemption -----
+
+export interface RedemptionPayload {
+  centerId: string;
+  failureReason?: string;
+  /** Fulfillment weight (kg); overrides voucher weight when provided */
+  weightKg?: number;
 }
 
 export interface RedeemResponse {

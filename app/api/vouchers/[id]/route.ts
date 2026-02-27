@@ -83,6 +83,19 @@ export async function GET(
       organization: {
         select: { logoUrl: true, name: true },
       },
+      redemptions: {
+        orderBy: { redeemedAt: "desc" },
+        take: 1,
+        select: {
+          id: true,
+          voucherId: true,
+          redeemedAt: true,
+          redeemedById: true,
+          centerId: true,
+          failureReason: true,
+          weightKg: true,
+        },
+      },
     },
   });
 
@@ -94,6 +107,7 @@ export async function GET(
     return NextResponse.json({ message: "Forbidden" }, { status: 403 });
   }
 
+  const latestRedemption = voucher.redemptions[0] ?? null;
   return NextResponse.json({
     id: voucher.id,
     code: voucher.code,
@@ -105,12 +119,24 @@ export async function GET(
     expiryDate: voucher.expiryDate,
     status: voucher.status,
     collectionNotes: voucher.collectionNotes,
+    weightKg: voucher.weightKg,
     client: voucher.client,
     agency: voucher.agency,
     referralDetails: voucher.referralDetails,
     foodBankCenter: voucher.foodBankCenter,
     issuedBy: voucher.issuedBy,
     organization: voucher.organization,
+    redemption: latestRedemption
+      ? {
+          id: latestRedemption.id,
+          voucherId: latestRedemption.voucherId,
+          redeemedAt: latestRedemption.redeemedAt,
+          redeemedById: latestRedemption.redeemedById,
+          centerId: latestRedemption.centerId,
+          failureReason: latestRedemption.failureReason,
+          weightKg: latestRedemption.weightKg ?? undefined,
+        }
+      : null,
   });
 }
 

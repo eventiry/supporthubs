@@ -326,6 +326,7 @@ model Voucher {
   status             VoucherStatus @default(issued)
   issuedById         String
   collectionNotes    String?
+  weightKg           Float?        // Parcel weight at issue (kg)
   unfulfilledReason  String?
   createdAt          DateTime      @default(now())
   updatedAt          DateTime      @updatedAt
@@ -354,6 +355,7 @@ model Redemption {
   redeemedById  String
   centerId      String
   failureReason String?
+  weightKg      Float?   // Fulfillment weight (kg); can override voucher weight at redeem
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
