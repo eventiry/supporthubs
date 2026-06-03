@@ -133,7 +133,7 @@ export function PeriodSelector({
   }
 
   return (
-    <div className={cn("flex flex-col gap-3", className)}>
+    <div className={cn("relative z-10 flex flex-col gap-3", className)}>
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
         <div className="w-full sm:w-auto sm:min-w-[220px]">
           <Label htmlFor="analytics-period" className="sr-only">
@@ -147,7 +147,7 @@ export function PeriodSelector({
             <SelectTrigger id="analytics-period" aria-label="Analytics time period">
               <SelectValue placeholder="Select period" />
             </SelectTrigger>
-            <SelectContent>
+            <SelectContent className="min-w-[var(--radix-select-trigger-width)]">
               <SelectGroup>
                 <SelectLabel>Presets</SelectLabel>
                 {PERIOD_OPTIONS.map((opt) => (
