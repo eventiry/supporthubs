@@ -19,7 +19,8 @@ export function PublicNav() {
   const { branding, isLoading: brandingLoading } = useBranding();
   const { showLogo, showName, displayName } = getBrandingDisplay(branding);
   const logoUrl = branding?.logoUrl?.trim();
-  const hasBrandColor = !!branding?.primaryColor;
+  // const hasBrandColor = !!branding?.primaryColor;
+  const hasBrandColor = false;
   const [open, setOpen] = useState(false);
 const  onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
   const linkClass = hasBrandColor

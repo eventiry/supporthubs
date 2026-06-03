@@ -13,7 +13,7 @@ export async function GET() {
   await setPlatformRlsContext();
   const plans = await db.subscriptionPlan.findMany({
     where: { active: true },
-    orderBy: [{ tier: "asc" }, { name: "asc" }],
+    orderBy: [{ tier: "desc" }, { priceMonthly: "desc" }],
   });
 
   const list = plans.map((p) => {

@@ -48,25 +48,31 @@ export function PublicFooter() {
                 <span className="h-5 w-28 animate-pulse rounded bg-muted" aria-hidden />
               </>
             ) : (
-              <>
-                {showLogo && logoUrl && (
-                  <img
-                    src={logoUrl}
-                    alt=""
-                    className="h-9 w-auto max-h-9 object-contain"
-                  />
-                )}
-                {showName && (
-                  <span
-                    className={cn(
-                      "font-semibold",
-                      hasBrandColor ? "text-primary" : "text-foreground"
-                    )}
-                  >
-                    {displayName}
-                  </span>
-                )}
-              </>
+              // <>
+              //   {showLogo && logoUrl && (
+              //     <img
+              //       src={logoUrl}
+              //       alt=""
+              //       className="h-9 w-auto max-h-9 object-contain"
+              //     />
+              //   )}
+              //   {showName && (
+              //     <span
+              //       className={cn(
+              //         "font-semibold",
+              //         hasBrandColor ? "text-primary" : "text-foreground"
+              //       )}
+              //     >
+              //       {displayName}
+              //     </span>
+              //   )}
+              // </>
+
+              <img
+              src={"/logo.png"}
+              alt=""
+              className="h-9 w-auto max-h-9 object-contain"
+              />
             )}
           </Link>
           <nav
