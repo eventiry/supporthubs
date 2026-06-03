@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
-import { SUBSCRIPTION_ENABLED } from "@/lib/config";
+import { SUBSCRIPTION_ENABLED, isSubscriptionFreeOrg } from "@/lib/config";
 
 /**
  * GET /api/billing — current organization's subscription summary (tenant auth required).
@@ -25,8 +25,11 @@ export async function GET(req: NextRequest) {
     select: { cancelAtPeriodEnd: true },
   });
 
+  const isComplimentaryOrg = isSubscriptionFreeOrg(org.id);
+
   return NextResponse.json({
     subscriptionEnabled: SUBSCRIPTION_ENABLED,
+    isComplimentaryOrg,
     plan: org.subscriptionPlan
       ? {
           id: org.subscriptionPlan.id,

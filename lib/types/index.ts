@@ -312,6 +312,8 @@ export type BillingStatusType = "none" | "trialing" | "active" | "past_due" | "c
 
 export interface BillingResponse {
   subscriptionEnabled: boolean;
+  /** True when org is in SELECTED_SUBSCRIPTION_FREE_ORGS (complimentary unlimited access). */
+  isComplimentaryOrg?: boolean;
   plan: {
     id: string;
     name: string;

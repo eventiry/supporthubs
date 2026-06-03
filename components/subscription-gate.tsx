@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/lib/contexts/session-context";
+import { isSubscriptionFreeOrgClient } from "@/lib/config";
 import { api } from "@/lib/api";
 import type { BillingResponse } from "@/lib/types";
 import { Button } from "@/components/button";
@@ -11,8 +12,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 
 /**
  * When SUBSCRIPTION_ENABLED, tenant users (organizationId set) must have an active
- * subscription (plan + status active/trialing). Platform admins are not gated.
- * Billing page is always allowed so users can subscribe.
+ * subscription (plan + status active/trialing). Platform admins and complimentary
+ * orgs (SELECTED_SUBSCRIPTION_FREE_ORGS) are not gated. Billing page is always
+ * allowed so users can subscribe.
  */
 export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -25,7 +27,14 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
   const isTenantUser = user?.organizationId != null && user.organizationId !== "";
 
   useEffect(() => {
-    if (sessionLoading || !user || !isTenantUser || isBillingPage || isSettingsPage) {
+    if (
+      sessionLoading ||
+      !user ||
+      !isTenantUser ||
+      isSubscriptionFreeOrgClient(user.organizationId) ||
+      isBillingPage ||
+      isSettingsPage
+    ) {
       return;
     }
     setBillingLoading(true);
@@ -40,6 +49,9 @@ export function SubscriptionGate({ children }: { children: React.ReactNode }) {
     return <>{children}</>;
   }
   if (!isTenantUser) {
+    return <>{children}</>;
+  }
+  if (isSubscriptionFreeOrgClient(user.organizationId)) {
     return <>{children}</>;
   }
   if (isBillingPage || isSettingsPage) {

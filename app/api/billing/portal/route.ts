@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
 import { getStripe } from "@/lib/stripe";
+import { isSubscriptionFreeOrg } from "@/lib/config";
 
 /**
  * POST /api/billing/portal — create Stripe Customer Billing Portal session (tenant auth required).
@@ -12,8 +13,16 @@ export async function POST(req: NextRequest) {
   const out = await getSessionUserAndTenant(req);
   if (out instanceof NextResponse) return out;
 
+  const organizationId = out.tenant.organizationId;
+  if (isSubscriptionFreeOrg(organizationId)) {
+    return NextResponse.json(
+      { message: "Your organisation has complimentary platform access. Billing is not required." },
+      { status: 400 }
+    );
+  }
+
   const org = await db.organization.findUnique({
-    where: { id: out.tenant.organizationId },
+    where: { id: organizationId },
     select: { stripeCustomerId: true },
   });
   if (!org?.stripeCustomerId) {

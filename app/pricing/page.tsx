@@ -11,7 +11,7 @@ import { useSession } from "@/lib/contexts/session-context";
 import { getErrorMessage } from "@/lib/utils";
 import type { PublicPlanItem } from "@/lib/types";
 import { Loading } from "@/components/ui/loading";
-import { isSubscriptionFreeOrg, SUBSCRIPTION_ENABLED_CLIENT } from "@/lib/config";
+import { isSubscriptionFreeOrgClient, SUBSCRIPTION_ENABLED_CLIENT } from "@/lib/config";
 import {
   PlanIntervalToggle,
   formatPlanPrice,
@@ -49,7 +49,7 @@ export default function PricingPage() {
       router.replace("/dashboard");
       return;
     }
-    if (user && isSubscriptionFreeOrg(user.organizationId)) {
+    if (user && isSubscriptionFreeOrgClient(user.organizationId)) {
       router.replace("/dashboard");
       return;
     }

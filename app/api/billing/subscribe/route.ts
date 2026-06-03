@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
 import { getStripe } from "@/lib/stripe";
-import { SUBSCRIPTION_ENABLED } from "@/lib/config";
+import { SUBSCRIPTION_ENABLED, isSubscriptionFreeOrg } from "@/lib/config";
 import { setOrgToFreePlan } from "@/lib/subscription-defaults";
 
 /**
@@ -23,6 +23,13 @@ export async function POST(req: NextRequest) {
 
   const { user, tenant } = out;
   const organizationId = tenant.organizationId;
+
+  if (isSubscriptionFreeOrg(organizationId)) {
+    return NextResponse.json(
+      { message: "Your organisation has complimentary platform access. Billing is not required." },
+      { status: 400 }
+    );
+  }
 
   let body: unknown;
   try {

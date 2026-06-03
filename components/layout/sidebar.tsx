@@ -29,7 +29,7 @@ import { Permission } from "@/lib/rbac/permissions";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useBranding, getBrandingDisplay, getBrandingInitials } from "@/lib/contexts/branding-context";
 import { cn } from "@/lib/utils";
-import { SUBSCRIPTION_ENABLED_CLIENT } from "@/lib/config";
+import { SUBSCRIPTION_ENABLED_CLIENT, isSubscriptionFreeOrgClient } from "@/lib/config";
 
 
 function NavItems({
@@ -59,7 +59,15 @@ function NavItems({
     { href: "/dashboard/users", label: "Users", permission: Permission.USER_MANAGE, icon: UserCog },
     { href: "/dashboard/analytics", label: "Analytics", permission: Permission.REPORTS_READ, icon: LineChart },
     // { href: "/dashboard/reports", label: "Reports", permission: Permission.REPORTS_READ, icon: BarChart3 },
-    { href: "/dashboard/billing", label: "Billing", permission: Permission.SETTINGS_READ, icon: Banknote, hidden: !SUBSCRIPTION_ENABLED_CLIENT },
+    {
+      href: "/dashboard/billing",
+      label: "Billing",
+      permission: Permission.SETTINGS_READ,
+      icon: Banknote,
+      hidden:
+        !SUBSCRIPTION_ENABLED_CLIENT ||
+        !!(user?.organizationId && isSubscriptionFreeOrgClient(user.organizationId)),
+    },
     { href: "/dashboard/settings", label: "Settings", permission: Permission.SETTINGS_READ, icon: Settings},
     { href: "/dashboard/platform/organizations", label: "Organizations", permission: Permission.ORGANIZATION_VIEW, icon: Briefcase },
     { href: "/dashboard/platform/invitations", label: "Invitations", permission: Permission.ORGANIZATION_VIEW, icon: Globe },

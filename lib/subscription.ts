@@ -5,8 +5,13 @@
  */
 
 import { db } from "@/lib/db";
-import { SUBSCRIPTION_ENABLED } from "@/lib/config";
+import { SUBSCRIPTION_ENABLED, isSubscriptionFreeOrg } from "@/lib/config";
 import { ensureOrgHasDefaultPlan } from "@/lib/subscription-defaults";
+
+/** Complimentary orgs bypass plan limits and subscription gates. */
+export function hasUnlimitedPlatformAccess(organizationId: string): boolean {
+  return isSubscriptionFreeOrg(organizationId);
+}
 
 export interface PlanLimits {
   maxUsers: number | null;
@@ -42,6 +47,9 @@ export async function getPlanLimitsForOrganization(organizationId: string): Prom
   subscriptionStatus: string;
   canUse: boolean;
 }> {
+  if (hasUnlimitedPlatformAccess(organizationId)) {
+    return { limits: DEFAULT_LIMITS, subscriptionStatus: "active", canUse: true };
+  }
   if (SUBSCRIPTION_ENABLED) {
     await ensureOrgHasDefaultPlan(organizationId);
   }
@@ -79,7 +87,7 @@ export async function canCreateUser(
   isPlatformAdmin: boolean
 ): Promise<{ allowed: boolean; message?: string }> {
   if (isPlatformAdmin) return { allowed: true };
-  if (!SUBSCRIPTION_ENABLED) return { allowed: true };
+  if (!SUBSCRIPTION_ENABLED || hasUnlimitedPlatformAccess(organizationId)) return { allowed: true };
 
   const { limits, canUse } = await getPlanLimitsForOrganization(organizationId);
   if (!canUse) {
@@ -102,7 +110,7 @@ export async function canCreateAgency(
   isPlatformAdmin: boolean
 ): Promise<{ allowed: boolean; message?: string }> {
   if (isPlatformAdmin) return { allowed: true };
-  if (!SUBSCRIPTION_ENABLED) return { allowed: true };
+  if (!SUBSCRIPTION_ENABLED || hasUnlimitedPlatformAccess(organizationId)) return { allowed: true };
 
   const { limits, canUse } = await getPlanLimitsForOrganization(organizationId);
   if (!canUse) {
@@ -125,7 +133,7 @@ export async function canCreateVoucher(
   isPlatformAdmin: boolean
 ): Promise<{ allowed: boolean; message?: string }> {
   if (isPlatformAdmin) return { allowed: true };
-  if (!SUBSCRIPTION_ENABLED) return { allowed: true };
+  if (!SUBSCRIPTION_ENABLED || hasUnlimitedPlatformAccess(organizationId)) return { allowed: true };
 
   const { limits, canUse } = await getPlanLimitsForOrganization(organizationId);
   if (!canUse) {

@@ -37,10 +37,20 @@ function parseSelectedOrgs(envValue: string | undefined): string[] {
 
 /** Server-side: org IDs with special rules (from SELECTED_ORGS). */
 export const SELECTED_ORGS = parseSelectedOrgs(process.env.NEXT_PUBLIC_SELECTED_ORGS || process.env.SELECTED_ORGS);
+/**
+ * Organization IDs with complimentary platform access: unlimited features, no billing UI,
+ * no plan limits. Comma-separated in env (set both server and public vars in production).
+ */
 export const SELECTED_SUBSCRIPTION_FREE_ORGS = parseSelectedOrgs(
-  process.env.NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS
+  process.env.NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS ||
+    process.env.SELECTED_SUBSCRIPTION_FREE_ORGS
 );
 
+/** Client-side complimentary org list (from NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS). */
+export const NEXT_PUBLIC_SUBSCRIPTION_FREE_ORGS = parseSelectedOrgs(
+  process.env.NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS ||
+    process.env.SELECTED_SUBSCRIPTION_FREE_ORGS
+);
 
 /** Client-side: org IDs with special rules (from NEXT_PUBLIC_SELECTED_ORGS). Use in issue voucher UI. */
 export const NEXT_PUBLIC_SELECTED_ORGS = parseSelectedOrgs(
@@ -58,7 +68,14 @@ export function isOrgInSelectedOrgsClient(orgId: string | null | undefined): boo
   return NEXT_PUBLIC_SELECTED_ORGS.includes(orgId);
 }
 
+/** Server-side: complimentary org with unlimited platform access (no billing, no limits). */
 export function isSubscriptionFreeOrg(orgId: string | null | undefined): boolean {
   if (!orgId) return false;
   return SELECTED_SUBSCRIPTION_FREE_ORGS.includes(orgId);
+}
+
+/** Client-side helper: pass orgId from session; uses NEXT_PUBLIC_SUBSCRIPTION_FREE_ORGS. */
+export function isSubscriptionFreeOrgClient(orgId: string | null | undefined): boolean {
+  if (!orgId) return false;
+  return NEXT_PUBLIC_SUBSCRIPTION_FREE_ORGS.includes(orgId);
 }

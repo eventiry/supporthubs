@@ -4,6 +4,7 @@
  */
 
 import { db, setPlatformRlsContext } from "@/lib/db";
+import { isSubscriptionFreeOrg } from "@/lib/config";
 
 const DEFAULT_FREE_PLAN_SLUG = "starter";
 
@@ -53,6 +54,8 @@ export async function assignDefaultFreePlanToOrganization(organizationId: string
  * assign the default Starter plan so every org always has an active plan.
  */
 export async function ensureOrgHasDefaultPlan(organizationId: string): Promise<void> {
+  if (isSubscriptionFreeOrg(organizationId)) return;
+
   const org = await db.organization.findUnique({
     where: { id: organizationId },
     select: { subscriptionPlanId: true, subscriptionStatus: true },

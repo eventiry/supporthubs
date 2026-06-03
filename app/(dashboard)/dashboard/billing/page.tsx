@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRbac } from "@/lib/hooks/use-rbac";
 import { Permission } from "@/lib/rbac/permissions";
+import { isSubscriptionFreeOrgClient } from "@/lib/config";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import { Button } from "@/components/button";
 import { api } from "@/lib/api";
@@ -16,6 +17,7 @@ import {
   formatPlanPrice,
   type PlanBillingInterval,
 } from "@/components/billing/plan-interval-toggle";
+import { useRouter } from "next/navigation";
 
 const STATUS_LABELS: Record<string, string> = {
   none: "No subscription",
@@ -36,8 +38,9 @@ function formatDate(d: Date | string | null): string {
 }
 
 export default function BillingPage() {
-  const { hasPermission, isLoading: rbacLoading } = useRbac();
+  const { hasPermission, isLoading: rbacLoading, user } = useRbac();
   const canView = hasPermission(Permission.SETTINGS_READ);
+  const router = useRouter();
   const [billing, setBilling] = useState<BillingResponse | null>(null);
   const [plans, setPlans] = useState<PublicPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,6 +52,10 @@ export default function BillingPage() {
   const [billingInterval, setBillingInterval] = useState<PlanBillingInterval>("month");
 
   useEffect(() => {
+    if (user?.organizationId && isSubscriptionFreeOrgClient(user.organizationId)) {
+      router.replace("/dashboard");
+      return;
+    }
     if (canView) {
       Promise.all([api.billing.get(), api.plans.list().catch(() => [])])
         .then(([b, p]) => {
@@ -58,7 +65,7 @@ export default function BillingPage() {
         .catch((err) => setError(getErrorMessage(err)))
         .finally(() => setLoading(false));
     }
-  }, [canView]);
+  }, [canView, router, user?.organizationId]);
 
   async function openPortal() {
     setPortalError(null);
