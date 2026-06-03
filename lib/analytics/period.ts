@@ -167,12 +167,120 @@ export function resolveCustomAnalyticsPeriod(
       "From date must be on or before to date"
     );
   }
+  const fromDateStr = toDateOnlyUtc(fromDate);
+  const toDateStr = toDateOnlyUtc(toDate);
   return {
     period: "custom",
     fromDate,
     toDate,
-    fromDateStr: toDateOnlyUtc(fromDate),
-    toDateStr: toDateOnlyUtc(toDate),
-    label: "Custom range",
+    fromDateStr,
+    toDateStr,
+    label:
+      fromDateStr === toDateStr
+        ? formatSingleDayLabel(fromDateStr)
+        : "Custom range",
   };
+}
+
+function formatSingleDayLabel(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00.000Z");
+  if (Number.isNaN(d.getTime())) return "Single date";
+  return d.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+  });
+}
+
+/** ISO date (YYYY-MM-DD) for today in UTC. */
+export function todayDateOnlyUtc(referenceDate?: Date): string {
+  return toDateOnlyUtc(referenceDate ?? new Date());
+}
+
+export type AnalyticsPeriodSelection =
+  | { kind: "preset"; preset: AnalyticsPeriodPreset }
+  | { kind: "single"; date: string }
+  | { kind: "range"; fromDate: string; toDate: string };
+
+export const DEFAULT_ANALYTICS_PERIOD: AnalyticsPeriodPreset = "monthly";
+
+export function parseAnalyticsSelectionFromSearchParams(
+  params: URLSearchParams
+): AnalyticsPeriodSelection {
+  const from = params.get("fromDate")?.trim();
+  const to = params.get("toDate")?.trim();
+  if (from && to) {
+    if (from === to) return { kind: "single", date: from };
+    return { kind: "range", fromDate: from, toDate: to };
+  }
+  const period = params.get("period")?.trim();
+  if (period && isAnalyticsPeriodPreset(period)) {
+    return { kind: "preset", preset: period };
+  }
+  return { kind: "preset", preset: DEFAULT_ANALYTICS_PERIOD };
+}
+
+export function analyticsSelectionToSearchParams(
+  selection: AnalyticsPeriodSelection
+): URLSearchParams {
+  const sp = new URLSearchParams();
+  if (selection.kind === "preset") {
+    sp.set("period", selection.preset);
+  } else if (selection.kind === "single") {
+    sp.set("fromDate", selection.date);
+    sp.set("toDate", selection.date);
+  } else {
+    sp.set("fromDate", selection.fromDate);
+    sp.set("toDate", selection.toDate);
+  }
+  return sp;
+}
+
+export function analyticsSelectionToApiParams(selection: AnalyticsPeriodSelection): {
+  period?: AnalyticsPeriodPreset;
+  fromDate?: string;
+  toDate?: string;
+} {
+  if (selection.kind === "preset") {
+    return { period: selection.preset };
+  }
+  if (selection.kind === "single") {
+    return { fromDate: selection.date, toDate: selection.date };
+  }
+  return { fromDate: selection.fromDate, toDate: selection.toDate };
+}
+
+export function getAnalyticsSelectionDisplayLabel(
+  selection: AnalyticsPeriodSelection
+): string {
+  if (selection.kind === "preset") {
+    return PERIOD_LABELS[selection.preset];
+  }
+  if (selection.kind === "single") {
+    return formatSingleDayLabel(selection.date);
+  }
+  return "Custom range";
+}
+
+export type PeriodSelectorDropdownValue =
+  | AnalyticsPeriodPreset
+  | "custom-single"
+  | "custom-range";
+
+export function selectionToDropdownValue(
+  selection: AnalyticsPeriodSelection
+): PeriodSelectorDropdownValue {
+  if (selection.kind === "preset") return selection.preset;
+  if (selection.kind === "single") return "custom-single";
+  return "custom-range";
+}
+
+export function isPeriodSelectorDropdownValue(
+  value: string
+): value is PeriodSelectorDropdownValue {
+  return (
+    isAnalyticsPeriodPreset(value) ||
+    value === "custom-single" ||
+    value === "custom-range"
+  );
 }

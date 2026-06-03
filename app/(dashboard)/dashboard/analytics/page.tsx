@@ -6,13 +6,18 @@ import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
 import { useRbac } from "@/lib/hooks/use-rbac";
 import { Permission } from "@/lib/rbac/permissions";
-import { isAnalyticsPeriodPreset } from "@/lib/analytics/period";
+import {
+  analyticsSelectionToApiParams,
+  analyticsSelectionToSearchParams,
+  parseAnalyticsSelectionFromSearchParams,
+  type AnalyticsPeriodSelection,
+} from "@/lib/analytics/period";
 import {
   formatAnalyticsNumber,
   formatAnalyticsPeriodRange,
 } from "@/lib/analytics/format";
 import { isAnalyticsDataEmpty } from "@/lib/analytics/empty-state";
-import type { AnalyticsData, AnalyticsPeriodPreset } from "@/lib/types";
+import type { AnalyticsData } from "@/lib/types";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import {
@@ -42,14 +47,10 @@ import {
   BarChart3,
 } from "lucide-react";
 
-const DEFAULT_PERIOD: AnalyticsPeriodPreset = "monthly";
-
-function periodFromSearchParams(
+function selectionFromSearchParams(
   params: URLSearchParams
-): AnalyticsPeriodPreset {
-  const p = params.get("period");
-  if (p && isAnalyticsPeriodPreset(p)) return p;
-  return DEFAULT_PERIOD;
+): AnalyticsPeriodSelection {
+  return parseAnalyticsSelectionFromSearchParams(params);
 }
 
 function redemptionRateLabel(issued: number, redemptions: number): string {
@@ -98,42 +99,44 @@ export default function AnalyticsPage() {
   const { hasPermission, isLoading: rbacLoading } = useRbac();
   const canRead = hasPermission(Permission.REPORTS_READ);
 
-  const [period, setPeriod] = useState<AnalyticsPeriodPreset>(() =>
-    periodFromSearchParams(searchParams)
+  const [selection, setSelection] = useState<AnalyticsPeriodSelection>(() =>
+    selectionFromSearchParams(searchParams)
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<AnalyticsData | null>(null);
 
-  const updatePeriodInUrl = useCallback(
-    (p: AnalyticsPeriodPreset) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set("period", p);
+  const updateSelectionInUrl = useCallback(
+    (next: AnalyticsPeriodSelection) => {
+      const params = analyticsSelectionToSearchParams(next);
       router.replace(`${pathname}?${params.toString()}`, { scroll: false });
     },
-    [pathname, router, searchParams]
+    [pathname, router]
   );
 
-  const handlePeriodChange = useCallback(
-    (p: AnalyticsPeriodPreset) => {
-      setPeriod(p);
-      updatePeriodInUrl(p);
+  const handleSelectionChange = useCallback(
+    (next: AnalyticsPeriodSelection) => {
+      setSelection(next);
+      updateSelectionInUrl(next);
     },
-    [updatePeriodInUrl]
+    [updateSelectionInUrl]
   );
 
   useEffect(() => {
-    const fromUrl = periodFromSearchParams(searchParams);
-    if (fromUrl !== period) {
-      setPeriod(fromUrl);
-    }
-  }, [searchParams, period]);
+    const fromUrl = selectionFromSearchParams(searchParams);
+    setSelection((current) => {
+      const currentParams = analyticsSelectionToSearchParams(current).toString();
+      const urlParams = analyticsSelectionToSearchParams(fromUrl).toString();
+      if (urlParams !== currentParams) return fromUrl;
+      return current;
+    });
+  }, [searchParams]);
 
-  const loadAnalytics = useCallback(async (p: AnalyticsPeriodPreset) => {
+  const loadAnalytics = useCallback(async (next: AnalyticsPeriodSelection) => {
     setError(null);
     setLoading(true);
     try {
-      const result = await api.analytics.get({ period: p });
+      const result = await api.analytics.get(analyticsSelectionToApiParams(next));
       setData(result);
     } catch (err) {
       setError(getErrorMessage(err));
@@ -144,10 +147,10 @@ export default function AnalyticsPage() {
   }, []);
 
   useEffect(() => {
-    if (canRead) loadAnalytics(period);
-  }, [canRead, period, loadAnalytics]);
+    if (canRead) loadAnalytics(selection);
+  }, [canRead, selection, loadAnalytics]);
 
-  const csvUrl = api.analytics.getCsvUrl({ period });
+  const csvUrl = api.analytics.getCsvUrl(analyticsSelectionToApiParams(selection));
   const showContentSkeleton = loading;
   const isEmpty = data != null && !loading && isAnalyticsDataEmpty(data);
 
@@ -218,8 +221,8 @@ export default function AnalyticsPage() {
         <PeriodSelectorSkeleton />
       ) : (
         <PeriodSelector
-          value={period}
-          onPeriodChange={handlePeriodChange}
+          value={selection}
+          onChange={handleSelectionChange}
           disabled={loading}
         />
       )}
