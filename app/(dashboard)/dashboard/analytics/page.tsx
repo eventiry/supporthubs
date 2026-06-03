@@ -42,7 +42,7 @@ import {
   BarChart3,
 } from "lucide-react";
 
-const DEFAULT_PERIOD: AnalyticsPeriodPreset = "weekly";
+const DEFAULT_PERIOD: AnalyticsPeriodPreset = "monthly";
 
 function periodFromSearchParams(
   params: URLSearchParams
