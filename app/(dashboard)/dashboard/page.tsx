@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRbac } from "@/lib/hooks/use-rbac";
 import { Permission } from "@/lib/rbac/permissions";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
+import { AnalyticsOverview } from "@/components/dashboard/analytics-overview";
 import { Loading } from "@/components/ui/loading";
 import {
   LayoutDashboard,
@@ -60,6 +61,8 @@ export default function DashboardPage() {
           Welcome back. Choose an action below or use the sidebar to navigate.
         </p>
       </div>
+
+      <AnalyticsOverview />
 
       <Card>
         <CardHeader>

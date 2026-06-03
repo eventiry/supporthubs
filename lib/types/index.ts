@@ -612,3 +612,80 @@ export interface ReportData {
   byCenter: ReportCenterRow[];
   topIncomeSources: ReportIncomeSourceRow[];
 }
+
+// ----- Analytics -----
+
+export type AnalyticsPeriodPreset =
+  | "daily"
+  | "weekly"
+  | "monthly"
+  | "60d"
+  | "yearly"
+  | "all";
+
+export type AnalyticsPeriodKind = AnalyticsPeriodPreset | "custom";
+
+export interface AnalyticsPeriod {
+  period: AnalyticsPeriodKind;
+  fromDate: string;
+  toDate: string;
+  label: string;
+}
+
+export interface AnalyticsUsers {
+  total: number;
+  active: number;
+  byRole: {
+    admin: number;
+    third_party: number;
+    back_office: number;
+  };
+}
+
+export interface AnalyticsClientsServed {
+  uniqueClients: number;
+  redemptions: number;
+}
+
+export interface AnalyticsVouchers {
+  issued: number;
+  redeemed: number;
+  expired: number;
+  unfulfilled: number;
+}
+
+export interface AnalyticsTimeSeriesPoint {
+  date: string;
+  issued: number;
+  redeemed: number;
+}
+
+export interface AnalyticsData {
+  period: AnalyticsPeriod;
+  users: AnalyticsUsers;
+  clientsServed: AnalyticsClientsServed;
+  vouchers: AnalyticsVouchers;
+  timeSeries: AnalyticsTimeSeriesPoint[];
+  byAgency: ReportAgencyRow[];
+  byCenter: ReportCenterRow[];
+  topIncomeSources: ReportIncomeSourceRow[];
+}
+
+export interface AnalyticsParams {
+  period?: AnalyticsPeriodPreset;
+  fromDate?: string;
+  toDate?: string;
+  format?: "json" | "csv";
+}
+
+/** Lightweight analytics for dashboard overview cards */
+export interface AnalyticsOverviewData {
+  period: AnalyticsPeriod;
+  users: { total: number };
+  clientsServed: { uniqueClients: number };
+  vouchers: { issued: number; redeemed: number };
+}
+
+export interface AnalyticsOverviewParams {
+  period?: AnalyticsPeriodPreset;
+}

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { api } from "@/lib/api";
 import { getErrorMessage } from "@/lib/utils";
 import { useRbac } from "@/lib/hooks/use-rbac";
@@ -10,6 +11,7 @@ import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
+import { LineChart, ArrowRight } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -90,7 +92,37 @@ export default function ReportsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-xl font-semibold text-foreground">Reports</h1>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-xl font-semibold text-foreground sm:text-2xl">Reports</h1>
+        <Button asChild className="shrink-0 w-full sm:w-auto">
+          <Link href="/dashboard/analytics?period=monthly">
+            <LineChart className="mr-2 h-4 w-4" />
+            View full analytics
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Link>
+        </Button>
+      </div>
+
+      <Card className="border-primary/20 bg-primary/5">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base">
+            <LineChart className="h-5 w-5 text-primary" />
+            Modern analytics
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Explore charts, period presets (daily through all time), clients served,
+            and user breakdowns on the analytics page.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Button asChild size="sm">
+            <Link href="/dashboard/analytics?period=monthly">
+              Open analytics dashboard
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Link>
+          </Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

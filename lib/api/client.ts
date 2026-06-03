@@ -34,6 +34,10 @@ import type {
   RedeemResponse,
   ReportParams,
   ReportData,
+  AnalyticsParams,
+  AnalyticsData,
+  AnalyticsOverviewParams,
+  AnalyticsOverviewData,
   UserListParams,
   UserListItem,
   UserCreatePayload,
@@ -314,6 +318,46 @@ export class ApiClient {
       this.request<{ message: string }>(`/api/vouchers/${encodeURIComponent(id)}`, {
         method: "DELETE",
       }),
+  };
+
+  /** GET /api/analytics — organization analytics. Requires REPORTS_READ. */
+  analytics = {
+    get: (params?: AnalyticsParams): Promise<AnalyticsData> => {
+      const sp = new URLSearchParams();
+      if (params?.period) sp.set("period", params.period);
+      if (params?.fromDate) sp.set("fromDate", params.fromDate);
+      if (params?.toDate) sp.set("toDate", params.toDate);
+      const q = sp.toString();
+      return this.request<AnalyticsData>(
+        `/api/analytics${q ? `?${q}` : ""}`,
+        { method: "GET" }
+      );
+    },
+    getCsvUrl: (
+      params?: Pick<AnalyticsParams, "period" | "fromDate" | "toDate">
+    ): string => {
+      const sp = new URLSearchParams();
+      if (params?.period) sp.set("period", params.period);
+      if (params?.fromDate) sp.set("fromDate", params.fromDate);
+      if (params?.toDate) sp.set("toDate", params.toDate);
+      sp.set("format", "csv");
+      const base =
+        this.baseUrl ||
+        (typeof window !== "undefined" ? "" : "http://localhost:3000");
+      return `${base}/api/analytics?${sp.toString()}`;
+    },
+    /** GET /api/analytics/overview — dashboard KPIs. Requires REPORTS_READ. */
+    overview: {
+      get: (params?: AnalyticsOverviewParams): Promise<AnalyticsOverviewData> => {
+        const sp = new URLSearchParams();
+        if (params?.period) sp.set("period", params.period);
+        const q = sp.toString();
+        return this.request<AnalyticsOverviewData>(
+          `/api/analytics/overview${q ? `?${q}` : ""}`,
+          { method: "GET" }
+        );
+      },
+    },
   };
 
   /** GET /api/reports — aggregated stats. Requires REPORTS_READ. */
