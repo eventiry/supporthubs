@@ -533,10 +533,13 @@ export class ApiClient {
   billing = {
     get: (): Promise<BillingResponse> =>
       this.request<BillingResponse>("/api/billing", { method: "GET" }),
-    subscribe: (planId: string): Promise<{ success?: boolean; url?: string }> =>
+    subscribe: (
+      planId: string,
+      interval: "month" | "year" = "month"
+    ): Promise<{ success?: boolean; url?: string }> =>
       this.request<{ success?: boolean; url?: string }>("/api/billing/subscribe", {
         method: "POST",
-        body: JSON.stringify({ planId }),
+        body: JSON.stringify({ planId, interval }),
       }),
     createPortalSession: (returnUrl?: string): Promise<{ url: string }> =>
       this.request<{ url: string }>("/api/billing/portal", {

@@ -11,7 +11,11 @@ import { getErrorMessage } from "@/lib/utils";
 import type { BillingResponse, PublicPlanItem } from "@/lib/types";
 import { Loading } from "@/components/ui/loading";
 import { Banknote, ExternalLink, AlertCircle } from "lucide-react";
-import { useRouter } from "next/navigation";
+import {
+  PlanIntervalToggle,
+  formatPlanPrice,
+  type PlanBillingInterval,
+} from "@/components/billing/plan-interval-toggle";
 
 const STATUS_LABELS: Record<string, string> = {
   none: "No subscription",
@@ -31,17 +35,9 @@ function formatDate(d: Date | string | null): string {
   });
 }
 
-function formatPrice(monthly: number | null, yearly: number | null): string {
-  if (monthly != null && monthly === 0 && (yearly == null || yearly === 0)) return "Free";
-  if (monthly != null && monthly > 0) return `£${monthly}/month`;
-  if (yearly != null && yearly > 0) return `£${yearly}/year`;
-  return "Contact us";
-}
-
 export default function BillingPage() {
   const { hasPermission, isLoading: rbacLoading } = useRbac();
   const canView = hasPermission(Permission.SETTINGS_READ);
-  const router = useRouter();
   const [billing, setBilling] = useState<BillingResponse | null>(null);
   const [plans, setPlans] = useState<PublicPlanItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,13 +46,9 @@ export default function BillingPage() {
   const [portalError, setPortalError] = useState<string | null>(null);
   const [subscribePlanId, setSubscribePlanId] = useState<string | null>(null);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
-  // const onSingleTenantMode = process.env.NEXT_PUBLIC_SINGLE_TENANT_MODE === "true";
-  const isBiilingActive =  process.env.SUBSCRIPTION_ENABLED === "true";
+  const [billingInterval, setBillingInterval] = useState<PlanBillingInterval>("month");
+
   useEffect(() => {
-    if (isBiilingActive) {
-      router.push("/dashboard");
-      return;
-    }
     if (canView) {
       Promise.all([api.billing.get(), api.plans.list().catch(() => [])])
         .then(([b, p]) => {
@@ -66,7 +58,7 @@ export default function BillingPage() {
         .catch((err) => setError(getErrorMessage(err)))
         .finally(() => setLoading(false));
     }
-  }, [canView, isBiilingActive, router]);
+  }, [canView]);
 
   async function openPortal() {
     setPortalError(null);
@@ -87,7 +79,7 @@ export default function BillingPage() {
     setSubscribeError(null);
     setSubscribePlanId(planId);
     try {
-      const res = await api.billing.subscribe(planId);
+      const res = await api.billing.subscribe(planId, billingInterval);
       if (res.url) {
         window.location.href = res.url;
         return;
@@ -171,7 +163,10 @@ export default function BillingPage() {
                       <p className="font-medium text-foreground">{billing.plan.name}</p>
                       <p className="text-sm text-muted-foreground capitalize">{billing.plan.tier}</p>
                       <p className="text-sm text-muted-foreground mt-1">
-                        {formatPrice(billing.plan.priceMonthly, billing.plan.priceYearly)}
+                        {formatPlanPrice(billing.plan, "month")}
+                        {billing.plan.priceYearly != null &&
+                          billing.plan.priceYearly > 0 &&
+                          ` · ${formatPlanPrice(billing.plan, "year")}`}
                       </p>
                     </div>
                     <span
@@ -245,17 +240,22 @@ export default function BillingPage() {
           {plans.length > 0 && (
             <Card>
               <CardHeader>
-                <CardTitle>Choose a plan</CardTitle>
-                <p className="text-sm text-muted-foreground">
-                  Subscribe to a plan below. Free plans activate immediately; paid plans open secure checkout.
-                </p>
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <CardTitle>Choose a plan</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Subscribe to a plan below. Free plans activate immediately; paid plans open secure checkout.
+                    </p>
+                  </div>
+                  <PlanIntervalToggle value={billingInterval} onChange={setBillingInterval} />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
                   {plans.map((plan) => {
                     const isCurrent = billing.plan?.id === plan.id && isActiveOrTrialing;
                     const isSubscribing = subscribePlanId === plan.id;
-                    const priceLabel = formatPrice(plan.priceMonthly, plan.priceYearly);
+                    const priceLabel = formatPlanPrice(plan, billingInterval);
                     const isContactUs = priceLabel === "Contact us";
                     return (
                       <div

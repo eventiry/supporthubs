@@ -11,16 +11,13 @@ import { useSession } from "@/lib/contexts/session-context";
 import { getErrorMessage } from "@/lib/utils";
 import type { PublicPlanItem } from "@/lib/types";
 import { Loading } from "@/components/ui/loading";
-import { isSubscriptionFreeOrg } from "@/lib/config";
+import { isSubscriptionFreeOrg, SUBSCRIPTION_ENABLED_CLIENT } from "@/lib/config";
+import {
+  PlanIntervalToggle,
+  formatPlanPrice,
+  type PlanBillingInterval,
+} from "@/components/billing/plan-interval-toggle";
 
-function formatPrice(monthly: number | null, yearly: number | null): string {
-  if (monthly != null && monthly === 0 && (yearly == null || yearly === 0)) return "Free";
-  if (monthly != null && monthly > 0) return `£${monthly}/mo`;
-  if (yearly != null && yearly > 0) return `£${yearly}/yr`;
-  return "Contact us";
-}
-
-/** Use plan features from API when present; otherwise derive from limits. */
 function getFeatures(plan: PublicPlanItem): string[] {
   if (Array.isArray(plan.features) && plan.features.length > 0) {
     return plan.features;
@@ -45,10 +42,10 @@ export default function PricingPage() {
   const [error, setError] = useState<string | null>(null);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [subscribeError, setSubscribeError] = useState<string | null>(null);
-  const isSubscriptionEnabled = process.env.SUBSCRITPION_ENABLED === "true";
+  const [billingInterval, setBillingInterval] = useState<PlanBillingInterval>("month");
 
   useEffect(() => {
-    if (!isSubscriptionEnabled) {
+    if (!SUBSCRIPTION_ENABLED_CLIENT) {
       router.replace("/dashboard");
       return;
     }
@@ -64,9 +61,9 @@ export default function PricingPage() {
         setPlans([]);
         setError("Unable to load plans.");
       });
-  }, [isSubscriptionEnabled, router, user]);
+  }, [router, user]);
 
-  if (!isSubscriptionEnabled) {
+  if (!SUBSCRIPTION_ENABLED_CLIENT) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <Loading />
@@ -78,7 +75,7 @@ export default function PricingPage() {
     setSubscribeError(null);
     setSubscribingPlanId(planId);
     try {
-      const res = await api.billing.subscribe(planId);
+      const res = await api.billing.subscribe(planId, billingInterval);
       if (res.url) {
         window.location.href = res.url;
         return;
@@ -104,6 +101,9 @@ export default function PricingPage() {
           <p className="mt-3 text-lg text-muted-foreground max-w-2xl mx-auto">
             Choose the plan that fits your organisation. All plans include voucher management, client records, and secure access for your team.
           </p>
+          <div className="mt-8 flex justify-center">
+            <PlanIntervalToggle value={billingInterval} onChange={setBillingInterval} />
+          </div>
         </div>
 
         {plans === null ? (
@@ -128,7 +128,7 @@ export default function PricingPage() {
             )}
             <div className="grid gap-8 md:grid-cols-3">
               {plans.map((plan, index) => {
-                const priceLabel = formatPrice(plan.priceMonthly, plan.priceYearly);
+                const priceLabel = formatPlanPrice(plan, billingInterval, { short: true });
                 const isFree = priceLabel === "Free";
                 const isContact = priceLabel === "Contact us";
                 const ctaLabel = isFree ? "Get started" : isContact ? "Contact us" : "Subscribe";

@@ -34,6 +34,8 @@ export async function POST(req: NextRequest) {
   if (!planId) {
     return NextResponse.json({ message: "planId is required" }, { status: 400 });
   }
+  const rawInterval = (body as { interval?: string }).interval;
+  const interval = rawInterval === "year" ? "year" : "month";
 
   const plan = await db.subscriptionPlan.findUnique({
     where: { id: planId, active: true },
@@ -59,10 +61,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
-  const stripePriceId = plan.stripePriceId ?? plan.stripePriceIdYearly;
+  const stripePriceId =
+    interval === "year"
+      ? plan.stripePriceIdYearly ?? plan.stripePriceId
+      : plan.stripePriceId ?? plan.stripePriceIdYearly;
   if (!stripePriceId) {
     return NextResponse.json(
-      { message: "This plan is not set up for online payment. Contact support to subscribe." },
+      {
+        message:
+          interval === "year"
+            ? "This plan is not set up for yearly billing. Contact support to subscribe."
+            : "This plan is not set up for online payment. Contact support to subscribe.",
+      },
       { status: 400 }
     );
   }

@@ -5,7 +5,16 @@
 
 /** When true, plan limits are enforced and public pricing/plans and webhooks are active. */
 export const SUBSCRIPTION_ENABLED =
-  process.env.SUBSCRIPTION_ENABLED === "true" || process.env.SUBSCRIPTION_ENABLED === "1";
+  process.env.NEXT_PUBLIC_SUBSCRIPTION_ENABLED === "true" || process.env.NEXT_PUBLIC_SUBSCRIPTION_ENABLED === "1";
+
+/**
+ * Client components cannot read SUBSCRIPTION_ENABLED unless it is set at build time.
+ * Set NEXT_PUBLIC_SUBSCRIPTION_ENABLED=true alongside SUBSCRIPTION_ENABLED in production.
+ */
+export const SUBSCRIPTION_ENABLED_CLIENT =
+  process.env.NEXT_PUBLIC_SUBSCRIPTION_ENABLED === "true" ||
+  process.env.NEXT_PUBLIC_SUBSCRIPTION_ENABLED === "1" ||
+  SUBSCRIPTION_ENABLED;
 
 /** Webhook signing secret (e.g. Stripe: whsec_...). Required to verify subscription webhooks. */
 export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? undefined;
@@ -28,7 +37,9 @@ function parseSelectedOrgs(envValue: string | undefined): string[] {
 
 /** Server-side: org IDs with special rules (from SELECTED_ORGS). */
 export const SELECTED_ORGS = parseSelectedOrgs(process.env.NEXT_PUBLIC_SELECTED_ORGS || process.env.SELECTED_ORGS);
-export const SELECTED_SUBSCRIPTION_FREE_ORGS = parseSelectedOrgs(process.env.NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS);
+export const SELECTED_SUBSCRIPTION_FREE_ORGS = parseSelectedOrgs(
+  process.env.NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS
+);
 
 
 /** Client-side: org IDs with special rules (from NEXT_PUBLIC_SELECTED_ORGS). Use in issue voucher UI. */
