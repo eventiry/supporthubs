@@ -29,32 +29,9 @@ import { Permission } from "@/lib/rbac/permissions";
 import { useIsMobile } from "@/lib/hooks/use-mobile";
 import { useBranding, getBrandingDisplay, getBrandingInitials } from "@/lib/contexts/branding-context";
 import { cn } from "@/lib/utils";
+import { isSubscriptionFreeOrg } from "@/lib/config";
 const isSubscriptionEnabled = process.env.SUBSCRIPTION_ENABLED === "true";   
-const NAV_ITEMS: {
-  href: string;
-  label: string;
-  permission: Permission;
-  hidden?: boolean;
-  icon: React.ComponentType<{ className?: string }>;
-}[] = [
-  { href: "/dashboard", label: "Dashboard", permission: Permission.DASHBOARD_READ, icon: LayoutDashboard },
-  { href: "/dashboard/clients", label: "Clients", permission: Permission.CLIENT_READ, icon: Users },
-  { href: "/dashboard/vouchers", label: "Vouchers", permission: Permission.VOUCHER_VIEW_OWN, icon: ClipboardList },
-  { href: "/dashboard/vouchers/issue", label: "Issue voucher", permission: Permission.VOUCHER_ISSUE, icon: Ticket },
-  { href: "/dashboard/redeem", label: "Redeem voucher", permission: Permission.VOUCHER_REDEEM, icon: Receipt },
-  { href: "/dashboard/agencies", label: "Agencies", permission: Permission.USER_MANAGE, icon: Building2 },
-  { href: "/dashboard/centers", label: "Food bank centres", permission: Permission.USER_MANAGE, icon: MapPin },
-  { href: "/dashboard/users", label: "Users", permission: Permission.USER_MANAGE, icon: UserCog },
-  { href: "/dashboard/analytics", label: "Analytics", permission: Permission.REPORTS_READ, icon: LineChart },
-  { href: "/dashboard/reports", label: "Reports", permission: Permission.REPORTS_READ, icon: BarChart3 },
-  { href: "/dashboard/billing", label: "Billing", permission: Permission.SETTINGS_READ, icon: Banknote, hidden: !isSubscriptionEnabled  },
-  { href: "/dashboard/settings", label: "Settings", permission: Permission.SETTINGS_READ, icon: Settings},
-  { href: "/dashboard/platform/organizations", label: "Organizations", permission: Permission.ORGANIZATION_VIEW, icon: Briefcase },
-  { href: "/dashboard/platform/invitations", label: "Invitations", permission: Permission.ORGANIZATION_VIEW, icon: Globe },
-  { href: "/dashboard/platform/plans", label: "Subscription Plans", permission: Permission.ORGANIZATION_VIEW, icon: CreditCard },
-  { href: "/dashboard/platform/subscriptions", label: "Subscriptions", permission: Permission.ORGANIZATION_VIEW, icon: ListOrdered },
-  { href: "/dashboard/platform/contact", label: "Contact enquiries", permission: Permission.ORGANIZATION_VIEW, icon: Mail },
-];
+
 
 function NavItems({
   onItemClick,
@@ -66,6 +43,31 @@ function NavItems({
   const pathname = usePathname();
   const { hasPermission, isLoading, user } = useRbac();
 
+  const NAV_ITEMS: {
+    href: string;
+    label: string;
+    permission: Permission;
+    hidden?: boolean;
+    icon: React.ComponentType<{ className?: string }>;
+  }[] = [
+    { href: "/dashboard", label: "Dashboard", permission: Permission.DASHBOARD_READ, icon: LayoutDashboard },
+    { href: "/dashboard/clients", label: "Clients", permission: Permission.CLIENT_READ, icon: Users },
+    { href: "/dashboard/vouchers", label: "Vouchers", permission: Permission.VOUCHER_VIEW_OWN, icon: ClipboardList },
+    { href: "/dashboard/vouchers/issue", label: "Issue voucher", permission: Permission.VOUCHER_ISSUE, icon: Ticket },
+    { href: "/dashboard/redeem", label: "Redeem voucher", permission: Permission.VOUCHER_REDEEM, icon: Receipt },
+    { href: "/dashboard/agencies", label: "Agencies", permission: Permission.USER_MANAGE, icon: Building2 },
+    { href: "/dashboard/centers", label: "Food bank centres", permission: Permission.USER_MANAGE, icon: MapPin },
+    { href: "/dashboard/users", label: "Users", permission: Permission.USER_MANAGE, icon: UserCog },
+    { href: "/dashboard/analytics", label: "Analytics", permission: Permission.REPORTS_READ, icon: LineChart },
+    // { href: "/dashboard/reports", label: "Reports", permission: Permission.REPORTS_READ, icon: BarChart3 },
+    { href: "/dashboard/billing", label: "Billing", permission: Permission.SETTINGS_READ, icon: Banknote, hidden: !isSubscriptionEnabled || (user && isSubscriptionFreeOrg(user.organizationId) ? true : undefined) },
+    { href: "/dashboard/settings", label: "Settings", permission: Permission.SETTINGS_READ, icon: Settings},
+    { href: "/dashboard/platform/organizations", label: "Organizations", permission: Permission.ORGANIZATION_VIEW, icon: Briefcase },
+    { href: "/dashboard/platform/invitations", label: "Invitations", permission: Permission.ORGANIZATION_VIEW, icon: Globe },
+    { href: "/dashboard/platform/plans", label: "Subscription Plans", permission: Permission.ORGANIZATION_VIEW, icon: CreditCard },
+    { href: "/dashboard/platform/subscriptions", label: "Subscriptions", permission: Permission.ORGANIZATION_VIEW, icon: ListOrdered },
+    { href: "/dashboard/platform/contact", label: "Contact enquiries", permission: Permission.ORGANIZATION_VIEW, icon: Mail },
+  ];
   const visibleItems = useMemo(
     () =>
       NAV_ITEMS.filter((item) => {

@@ -28,6 +28,8 @@ function parseSelectedOrgs(envValue: string | undefined): string[] {
 
 /** Server-side: org IDs with special rules (from SELECTED_ORGS). */
 export const SELECTED_ORGS = parseSelectedOrgs(process.env.NEXT_PUBLIC_SELECTED_ORGS || process.env.SELECTED_ORGS);
+export const SELECTED_SUBSCRIPTION_FREE_ORGS = parseSelectedOrgs(process.env.NEXT_PUBLIC_SELECTED_SUBSCRIPTION_FREE_ORGS);
+
 
 /** Client-side: org IDs with special rules (from NEXT_PUBLIC_SELECTED_ORGS). Use in issue voucher UI. */
 export const NEXT_PUBLIC_SELECTED_ORGS = parseSelectedOrgs(
@@ -43,4 +45,9 @@ export function isOrgInSelectedOrgs(orgId: string | null | undefined): boolean {
 export function isOrgInSelectedOrgsClient(orgId: string | null | undefined): boolean {
   if (!orgId) return false;
   return NEXT_PUBLIC_SELECTED_ORGS.includes(orgId);
+}
+
+export function isSubscriptionFreeOrg(orgId: string | null | undefined): boolean {
+  if (!orgId) return false;
+  return SELECTED_SUBSCRIPTION_FREE_ORGS.includes(orgId);
 }

@@ -11,6 +11,7 @@ import { useSession } from "@/lib/contexts/session-context";
 import { getErrorMessage } from "@/lib/utils";
 import type { PublicPlanItem } from "@/lib/types";
 import { Loading } from "@/components/ui/loading";
+import { isSubscriptionFreeOrg } from "@/lib/config";
 
 function formatPrice(monthly: number | null, yearly: number | null): string {
   if (monthly != null && monthly === 0 && (yearly == null || yearly === 0)) return "Free";
@@ -51,6 +52,11 @@ export default function PricingPage() {
       router.replace("/dashboard");
       return;
     }
+    if (user && isSubscriptionFreeOrg(user.organizationId)) {
+      router.replace("/dashboard");
+      return;
+    }
+
     api.plans
       .list()
       .then(setPlans)
@@ -58,7 +64,7 @@ export default function PricingPage() {
         setPlans([]);
         setError("Unable to load plans.");
       });
-  }, [isSubscriptionEnabled, router]);
+  }, [isSubscriptionEnabled, router, user]);
 
   if (!isSubscriptionEnabled) {
     return (
