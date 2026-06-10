@@ -1,6 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { aggregatePeopleFromRedemptions } from "@/lib/analytics/household";
+import {
+  aggregatePeopleFromRedemptions,
+  totalPeopleFromHousehold,
+} from "@/lib/analytics/household";
 import { toDateOnlyUtc } from "@/lib/analytics/period";
 import type {
   AnalyticsPeopleServed,
@@ -299,7 +302,7 @@ async function getByAgencyAnalytics(
   const agencyNameById = new Map(agencies.map((a) => [a.id, a.name]));
   const byAgencyMap = new Map<
     string,
-    { agencyName: string; issued: number; redeemed: number }
+    { agencyName: string; issued: number; redeemed: number; peopleServed: number }
   >();
 
   for (const v of vouchers) {
@@ -308,6 +311,7 @@ async function getByAgencyAnalytics(
         agencyName: agencyNameById.get(v.agencyId) ?? "Unknown",
         issued: 0,
         redeemed: 0,
+        peopleServed: 0,
       });
     }
     const row = byAgencyMap.get(v.agencyId)!;
@@ -315,15 +319,53 @@ async function getByAgencyAnalytics(
     if (v.status === "redeemed") row.redeemed += 1;
   }
 
+  const redemptionRows = await db.redemption.findMany({
+    where: redemptionWhere(organizationId, fromDate, toDate),
+    select: {
+      voucher: {
+        select: {
+          agencyId: true,
+          referralDetails: { select: { householdByAge: true } },
+        },
+      },
+    },
+  });
+
+  for (const r of redemptionRows) {
+    const agencyId = r.voucher.agencyId;
+    const people = totalPeopleFromHousehold(
+      r.voucher.referralDetails?.householdByAge
+    );
+    if (people <= 0) continue;
+
+    if (!byAgencyMap.has(agencyId)) {
+      byAgencyMap.set(agencyId, {
+        agencyName: agencyNameById.get(agencyId) ?? "Unknown",
+        issued: 0,
+        redeemed: 0,
+        peopleServed: 0,
+      });
+    }
+    byAgencyMap.get(agencyId)!.peopleServed += people;
+  }
+
   return Array.from(byAgencyMap.entries())
-    .filter(([, row]) => row.issued > 0 || row.redeemed > 0)
+    .filter(
+      ([, row]) =>
+        row.issued > 0 || row.redeemed > 0 || row.peopleServed > 0
+    )
     .map(([agencyId, row]) => ({
       agencyId,
       agencyName: row.agencyName,
       issued: row.issued,
       redeemed: row.redeemed,
+      peopleServed: row.peopleServed,
     }))
-    .sort((a, b) => b.issued + b.redeemed - (a.issued + a.redeemed));
+    .sort(
+      (a, b) =>
+        b.issued + b.redeemed + b.peopleServed -
+        (a.issued + a.redeemed + a.peopleServed)
+    );
 }
 
 async function getByCenterAnalytics(
@@ -333,7 +375,14 @@ async function getByCenterAnalytics(
 ): Promise<ReportCenterRow[]> {
   const redemptions = await db.redemption.findMany({
     where: redemptionWhere(organizationId, fromDate, toDate),
-    select: { centerId: true },
+    select: {
+      centerId: true,
+      voucher: {
+        select: {
+          referralDetails: { select: { householdByAge: true } },
+        },
+      },
+    },
   });
 
   if (redemptions.length === 0) return [];
@@ -345,18 +394,29 @@ async function getByCenterAnalytics(
   });
   const centerNameById = new Map(centers.map((c) => [c.id, c.name]));
 
-  const byCenterMap = new Map<string, number>();
+  const byCenterMap = new Map<
+    string,
+    { redeemed: number; peopleServed: number }
+  >();
   for (const r of redemptions) {
-    byCenterMap.set(r.centerId, (byCenterMap.get(r.centerId) ?? 0) + 1);
+    if (!byCenterMap.has(r.centerId)) {
+      byCenterMap.set(r.centerId, { redeemed: 0, peopleServed: 0 });
+    }
+    const row = byCenterMap.get(r.centerId)!;
+    row.redeemed += 1;
+    row.peopleServed += totalPeopleFromHousehold(
+      r.voucher.referralDetails?.householdByAge
+    );
   }
 
   return Array.from(byCenterMap.entries())
-    .map(([centerId, redeemed]) => ({
+    .map(([centerId, row]) => ({
       centerId,
       centerName: centerNameById.get(centerId) ?? "Unknown",
-      redeemed,
+      redeemed: row.redeemed,
+      peopleServed: row.peopleServed,
     }))
-    .sort((a, b) => b.redeemed - a.redeemed);
+    .sort((a, b) => b.redeemed + b.peopleServed - (a.redeemed + a.peopleServed));
 }
 
 async function getTopIncomeSourcesAnalytics(

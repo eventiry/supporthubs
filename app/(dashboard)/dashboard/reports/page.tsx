@@ -227,6 +227,7 @@ export default function ReportsPage() {
                       <TableHead>Agency</TableHead>
                       <TableHead className="text-right">Issued</TableHead>
                       <TableHead className="text-right">Redeemed</TableHead>
+                      <TableHead className="text-right">People served</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -235,6 +236,7 @@ export default function ReportsPage() {
                         <TableCell>{r.agencyName}</TableCell>
                         <TableCell className="text-right">{r.issued}</TableCell>
                         <TableCell className="text-right">{r.redeemed}</TableCell>
+                        <TableCell className="text-right">{r.peopleServed}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
@@ -258,6 +260,7 @@ export default function ReportsPage() {
                     <TableRow>
                       <TableHead>Centre</TableHead>
                       <TableHead className="text-right">Redeemed</TableHead>
+                      <TableHead className="text-right">People served</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -265,6 +268,7 @@ export default function ReportsPage() {
                       <TableRow key={r.centerId}>
                         <TableCell>{r.centerName}</TableCell>
                         <TableCell className="text-right">{r.redeemed}</TableCell>
+                        <TableCell className="text-right">{r.peopleServed}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

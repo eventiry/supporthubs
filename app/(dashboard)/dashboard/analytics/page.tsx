@@ -327,7 +327,8 @@ export default function AnalyticsPage() {
                 <CardHeader>
                   <CardTitle className="text-base">By agency</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Issued and redeemed vouchers by referring agency
+                    Issued and redeemed vouchers by referring agency, with people
+                    served from household data
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -342,6 +343,7 @@ export default function AnalyticsPage() {
                           <TableHead>Agency</TableHead>
                           <TableHead className="text-right">Issued</TableHead>
                           <TableHead className="text-right">Redeemed</TableHead>
+                          <TableHead className="text-right">People served</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -353,6 +355,9 @@ export default function AnalyticsPage() {
                             </TableCell>
                             <TableCell className="text-right tabular-nums">
                               {formatAnalyticsNumber(r.redeemed)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatAnalyticsNumber(r.peopleServed)}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -366,7 +371,7 @@ export default function AnalyticsPage() {
                 <CardHeader>
                   <CardTitle className="text-base">By food bank centre</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Redemptions at each centre
+                    Redemptions and people served at each centre
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -380,6 +385,7 @@ export default function AnalyticsPage() {
                         <TableRow>
                           <TableHead>Centre</TableHead>
                           <TableHead className="text-right">Redeemed</TableHead>
+                          <TableHead className="text-right">People served</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -388,6 +394,9 @@ export default function AnalyticsPage() {
                             <TableCell>{r.centerName}</TableCell>
                             <TableCell className="text-right tabular-nums">
                               {formatAnalyticsNumber(r.redeemed)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {formatAnalyticsNumber(r.peopleServed)}
                             </TableCell>
                           </TableRow>
                         ))}

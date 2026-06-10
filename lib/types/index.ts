@@ -591,12 +591,14 @@ export interface ReportAgencyRow {
   agencyName: string;
   issued: number;
   redeemed: number;
+  peopleServed: number;
 }
 
 export interface ReportCenterRow {
   centerId: string;
   centerName: string;
   redeemed: number;
+  peopleServed: number;
 }
 
 export interface ReportIncomeSourceRow {

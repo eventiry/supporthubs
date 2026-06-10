@@ -3,6 +3,7 @@ import { getPermissionsForRole } from "@/lib/rbac/permissions";
 import { Permission } from "@/lib/rbac/permissions";
 import { db } from "@/lib/db";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
+import { totalPeopleFromHousehold } from "@/lib/analytics/household";
 
 function toDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -74,6 +75,12 @@ export async function GET(req: NextRequest) {
       select: {
         voucherId: true,
         centerId: true,
+        voucher: {
+          select: {
+            agencyId: true,
+            referralDetails: { select: { householdByAge: true } },
+          },
+        },
       },
     }),
     db.agency.findMany({
@@ -89,7 +96,7 @@ export async function GET(req: NextRequest) {
   const agencyNameById = new Map(agencies.map((a) => [a.id, a.name]));
   const byAgencyMap = new Map<
     string,
-    { agencyName: string; issued: number; redeemed: number }
+    { agencyName: string; issued: number; redeemed: number; peopleServed: number }
   >();
   for (const v of vouchers) {
     if (!byAgencyMap.has(v.agencyId)) {
@@ -97,21 +104,46 @@ export async function GET(req: NextRequest) {
         agencyName: agencyNameById.get(v.agencyId) ?? "Unknown",
         issued: 0,
         redeemed: 0,
+        peopleServed: 0,
       });
     }
     const row = byAgencyMap.get(v.agencyId)!;
     row.issued += 1;
     if (v.status === "redeemed") row.redeemed += 1;
   }
+  for (const r of redemptions) {
+    const agencyId = r.voucher.agencyId;
+    const people = totalPeopleFromHousehold(
+      r.voucher.referralDetails?.householdByAge
+    );
+    if (people <= 0) continue;
+    if (!byAgencyMap.has(agencyId)) {
+      byAgencyMap.set(agencyId, {
+        agencyName: agencyNameById.get(agencyId) ?? "Unknown",
+        issued: 0,
+        redeemed: 0,
+        peopleServed: 0,
+      });
+    }
+    byAgencyMap.get(agencyId)!.peopleServed += people;
+  }
   const byAgency = Array.from(byAgencyMap.entries())
-    .filter(([, row]) => row.issued > 0 || row.redeemed > 0)
+    .filter(
+      ([, row]) =>
+        row.issued > 0 || row.redeemed > 0 || row.peopleServed > 0
+    )
     .map(([agencyId, row]) => ({
       agencyId,
       agencyName: row.agencyName,
       issued: row.issued,
       redeemed: row.redeemed,
+      peopleServed: row.peopleServed,
     }))
-    .sort((a, b) => b.issued + b.redeemed - (a.issued + a.redeemed));
+    .sort(
+      (a, b) =>
+        b.issued + b.redeemed + b.peopleServed -
+        (a.issued + a.redeemed + a.peopleServed)
+    );
 
   const centerIds = new Set(redemptions.map((r) => r.centerId));
   const centers = await db.foodBankCenter.findMany({
@@ -122,17 +154,28 @@ export async function GET(req: NextRequest) {
     select: { id: true, name: true },
   });
   const centerNameById = new Map(centers.map((c) => [c.id, c.name]));
-  const byCenterMap = new Map<string, number>();
+  const byCenterMap = new Map<
+    string,
+    { redeemed: number; peopleServed: number }
+  >();
   for (const r of redemptions) {
-    byCenterMap.set(r.centerId, (byCenterMap.get(r.centerId) ?? 0) + 1);
+    if (!byCenterMap.has(r.centerId)) {
+      byCenterMap.set(r.centerId, { redeemed: 0, peopleServed: 0 });
+    }
+    const row = byCenterMap.get(r.centerId)!;
+    row.redeemed += 1;
+    row.peopleServed += totalPeopleFromHousehold(
+      r.voucher.referralDetails?.householdByAge
+    );
   }
-  const byCenter = Array.from(byCenterMap.entries()).map(
-    ([centerId, redeemed]) => ({
+  const byCenter = Array.from(byCenterMap.entries())
+    .map(([centerId, row]) => ({
       centerId,
       centerName: centerNameById.get(centerId) ?? "Unknown",
-      redeemed,
-    })
-  ).sort((a, b) => b.redeemed - a.redeemed);
+      redeemed: row.redeemed,
+      peopleServed: row.peopleServed,
+    }))
+    .sort((a, b) => b.redeemed + b.peopleServed - (a.redeemed + a.peopleServed));
 
   const incomeSourceCounts = new Map<string, number>();
   for (const v of vouchers) {
@@ -164,15 +207,20 @@ export async function GET(req: NextRequest) {
       ["Redeemed", String(data.redeemedCount)],
       ["Expired", String(data.expiredCount)],
       [],
-      ["Agency", "Issued", "Redeemed"],
+      ["Agency", "Issued", "Redeemed", "People served"],
       ...data.byAgency.map((r) => [
         r.agencyName,
         String(r.issued),
         String(r.redeemed),
+        String(r.peopleServed),
       ]),
       [],
-      ["Center", "Redeemed"],
-      ...data.byCenter.map((r) => [r.centerName, String(r.redeemed)]),
+      ["Center", "Redeemed", "People served"],
+      ...data.byCenter.map((r) => [
+        r.centerName,
+        String(r.redeemed),
+        String(r.peopleServed),
+      ]),
       [],
       ["Income Source", "Count"],
       ...data.topIncomeSources.map((r) => [r.incomeSource, String(r.count)]),
