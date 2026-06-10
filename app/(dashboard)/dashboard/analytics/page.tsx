@@ -411,7 +411,8 @@ export default function AnalyticsPage() {
               <CardHeader>
                 <CardTitle className="text-base">Top income sources</CardTitle>
                 <p className="text-sm text-muted-foreground">
-                  Household income sources on issued vouchers
+                  Household income sources on issued vouchers, with people served
+                  from redeemed vouchers
                 </p>
               </CardHeader>
               <CardContent className="p-0">
@@ -425,6 +426,7 @@ export default function AnalyticsPage() {
                       <TableRow>
                         <TableHead>Income source</TableHead>
                         <TableHead className="text-right">Vouchers</TableHead>
+                        <TableHead className="text-right">People served</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -433,6 +435,9 @@ export default function AnalyticsPage() {
                           <TableCell>{r.incomeSource}</TableCell>
                           <TableCell className="text-right tabular-nums">
                             {formatAnalyticsNumber(r.count)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatAnalyticsNumber(r.peopleServed)}
                           </TableCell>
                         </TableRow>
                       ))}

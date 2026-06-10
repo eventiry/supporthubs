@@ -74,8 +74,12 @@ function buildAnalyticsCsv(data: AnalyticsData): string {
       String(r.peopleServed),
     ]),
     [],
-    ["Income Source", "Count"],
-    ...data.topIncomeSources.map((r) => [r.incomeSource, String(r.count)]),
+    ["Income Source", "Vouchers", "People served"],
+    ...data.topIncomeSources.map((r) => [
+      r.incomeSource,
+      String(r.count),
+      String(r.peopleServed),
+    ]),
   ];
   return rows.map((row) => row.map(escapeCsvCell).join(",")).join("\n");
 }

@@ -291,7 +291,8 @@ export default function ReportsPage() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Income source</TableHead>
-                      <TableHead className="text-right">Count</TableHead>
+                      <TableHead className="text-right">Vouchers</TableHead>
+                      <TableHead className="text-right">People served</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -299,6 +300,7 @@ export default function ReportsPage() {
                       <TableRow key={i}>
                         <TableCell>{r.incomeSource}</TableCell>
                         <TableCell className="text-right">{r.count}</TableCell>
+                        <TableCell className="text-right">{r.peopleServed}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

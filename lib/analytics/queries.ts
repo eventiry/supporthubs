@@ -419,27 +419,65 @@ async function getByCenterAnalytics(
     .sort((a, b) => b.redeemed + b.peopleServed - (a.redeemed + a.peopleServed));
 }
 
+function incomeSourceKey(incomeSource: string | null | undefined): string {
+  return incomeSource?.trim() || "(Not specified)";
+}
+
 async function getTopIncomeSourcesAnalytics(
   organizationId: string,
   fromDate: Date,
   toDate: Date
 ): Promise<ReportIncomeSourceRow[]> {
-  const vouchers = await db.voucher.findMany({
-    where: voucherIssueWhere(organizationId, fromDate, toDate),
-    select: {
-      referralDetails: { select: { incomeSource: true } },
-    },
-  });
+  const [vouchers, redemptions] = await Promise.all([
+    db.voucher.findMany({
+      where: voucherIssueWhere(organizationId, fromDate, toDate),
+      select: {
+        referralDetails: { select: { incomeSource: true } },
+      },
+    }),
+    db.redemption.findMany({
+      where: redemptionWhere(organizationId, fromDate, toDate),
+      select: {
+        voucher: {
+          select: {
+            referralDetails: {
+              select: { incomeSource: true, householdByAge: true },
+            },
+          },
+        },
+      },
+    }),
+  ]);
 
-  const incomeSourceCounts = new Map<string, number>();
+  const bySource = new Map<string, { count: number; peopleServed: number }>();
+
   for (const v of vouchers) {
-    const key = v.referralDetails?.incomeSource?.trim() || "(Not specified)";
-    incomeSourceCounts.set(key, (incomeSourceCounts.get(key) ?? 0) + 1);
+    const key = incomeSourceKey(v.referralDetails?.incomeSource);
+    if (!bySource.has(key)) {
+      bySource.set(key, { count: 0, peopleServed: 0 });
+    }
+    bySource.get(key)!.count += 1;
   }
 
-  return Array.from(incomeSourceCounts.entries())
-    .map(([incomeSource, count]) => ({ incomeSource, count }))
-    .sort((a, b) => b.count - a.count)
+  for (const r of redemptions) {
+    const key = incomeSourceKey(r.voucher.referralDetails?.incomeSource);
+    const people = totalPeopleFromHousehold(
+      r.voucher.referralDetails?.householdByAge
+    );
+    if (people <= 0) continue;
+    if (!bySource.has(key)) {
+      bySource.set(key, { count: 0, peopleServed: 0 });
+    }
+    bySource.get(key)!.peopleServed += people;
+  }
+
+  return Array.from(bySource.entries())
+    .map(([incomeSource, row]) => ({
+      incomeSource,
+      count: row.count,
+      peopleServed: row.peopleServed,
+    }))
+    .sort((a, b) => b.count + b.peopleServed - (a.count + a.peopleServed))
     .slice(0, 15);
 }
 

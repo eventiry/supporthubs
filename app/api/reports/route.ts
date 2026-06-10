@@ -78,7 +78,9 @@ export async function GET(req: NextRequest) {
         voucher: {
           select: {
             agencyId: true,
-            referralDetails: { select: { householdByAge: true } },
+            referralDetails: {
+              select: { incomeSource: true, householdByAge: true },
+            },
           },
         },
       },
@@ -177,15 +179,37 @@ export async function GET(req: NextRequest) {
     }))
     .sort((a, b) => b.redeemed + b.peopleServed - (a.redeemed + a.peopleServed));
 
-  const incomeSourceCounts = new Map<string, number>();
+  const incomeSourceMap = new Map<
+    string,
+    { count: number; peopleServed: number }
+  >();
   for (const v of vouchers) {
     const key =
       (v.referralDetails?.incomeSource?.trim()) || "(Not specified)";
-    incomeSourceCounts.set(key, (incomeSourceCounts.get(key) ?? 0) + 1);
+    if (!incomeSourceMap.has(key)) {
+      incomeSourceMap.set(key, { count: 0, peopleServed: 0 });
+    }
+    incomeSourceMap.get(key)!.count += 1;
   }
-  const topIncomeSources = Array.from(incomeSourceCounts.entries())
-    .map(([incomeSource, count]) => ({ incomeSource, count }))
-    .sort((a, b) => b.count - a.count)
+  for (const r of redemptions) {
+    const key =
+      (r.voucher.referralDetails?.incomeSource?.trim()) || "(Not specified)";
+    const people = totalPeopleFromHousehold(
+      r.voucher.referralDetails?.householdByAge
+    );
+    if (people <= 0) continue;
+    if (!incomeSourceMap.has(key)) {
+      incomeSourceMap.set(key, { count: 0, peopleServed: 0 });
+    }
+    incomeSourceMap.get(key)!.peopleServed += people;
+  }
+  const topIncomeSources = Array.from(incomeSourceMap.entries())
+    .map(([incomeSource, row]) => ({
+      incomeSource,
+      count: row.count,
+      peopleServed: row.peopleServed,
+    }))
+    .sort((a, b) => b.count + b.peopleServed - (a.count + a.peopleServed))
     .slice(0, 15);
 
   const data = {
@@ -222,8 +246,12 @@ export async function GET(req: NextRequest) {
         String(r.peopleServed),
       ]),
       [],
-      ["Income Source", "Count"],
-      ...data.topIncomeSources.map((r) => [r.incomeSource, String(r.count)]),
+      ["Income Source", "Vouchers", "People served"],
+      ...data.topIncomeSources.map((r) => [
+        r.incomeSource,
+        String(r.count),
+        String(r.peopleServed),
+      ]),
     ];
     const csv = rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(",")).join("\n");
     return new NextResponse(csv, {

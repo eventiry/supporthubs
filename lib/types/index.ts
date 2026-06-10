@@ -604,6 +604,7 @@ export interface ReportCenterRow {
 export interface ReportIncomeSourceRow {
   incomeSource: string;
   count: number;
+  peopleServed: number;
 }
 
 export interface ReportData {
