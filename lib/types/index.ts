@@ -649,6 +649,17 @@ export interface AnalyticsClientsServed {
   redemptions: number;
 }
 
+/** People supported across redeemed vouchers (from householdByAge at issue). */
+export interface AnalyticsPeopleServed {
+  totalPeople: number;
+  children: number;
+  adults: number;
+  byAgeBand: { band: string; count: number }[];
+  redemptions: number;
+  redemptionsWithData: number;
+  redemptionsWithoutData: number;
+}
+
 export interface AnalyticsVouchers {
   issued: number;
   redeemed: number;
@@ -666,6 +677,7 @@ export interface AnalyticsData {
   period: AnalyticsPeriod;
   users: AnalyticsUsers;
   clientsServed: AnalyticsClientsServed;
+  peopleServed: AnalyticsPeopleServed;
   vouchers: AnalyticsVouchers;
   timeSeries: AnalyticsTimeSeriesPoint[];
   byAgency: ReportAgencyRow[];
@@ -685,6 +697,7 @@ export interface AnalyticsOverviewData {
   period: AnalyticsPeriod;
   users: { total: number };
   clientsServed: { uniqueClients: number };
+  peopleServed: { totalPeople: number; children: number; adults: number };
   vouchers: { issued: number; redeemed: number };
 }
 

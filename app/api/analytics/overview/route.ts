@@ -70,6 +70,7 @@ export async function GET(req: NextRequest) {
     },
     users: overview.users,
     clientsServed: overview.clientsServed,
+    peopleServed: overview.peopleServed,
     vouchers: overview.vouchers,
   };
 

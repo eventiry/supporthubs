@@ -17,7 +17,7 @@ import {
   formatAnalyticsPeriodRange,
 } from "@/lib/analytics/format";
 import { isAnalyticsDataEmpty } from "@/lib/analytics/empty-state";
-import type { AnalyticsData } from "@/lib/types";
+import type { AnalyticsData, AnalyticsPeopleServed } from "@/lib/types";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import {
@@ -37,9 +37,11 @@ import {
 import { ChartCardSkeleton } from "@/components/analytics/chart-skeleton";
 import { VoucherTrendChart } from "@/components/analytics/voucher-trend-chart";
 import { UsersByRoleChart } from "@/components/analytics/users-by-role-chart";
+import { PeopleByAgeChart } from "@/components/analytics/people-by-age-chart";
 import {
   Users,
   UserCheck,
+  UsersRound,
   Ticket,
   Receipt,
   Percent,
@@ -57,6 +59,31 @@ function redemptionRateLabel(issued: number, redemptions: number): string {
   if (issued <= 0) return "—";
   const pct = Math.min(100, Math.round((redemptions / issued) * 100));
   return `${pct}%`;
+}
+
+function peopleServedSubtitle(people: AnalyticsPeopleServed): string {
+  const parts: string[] = [];
+  if (people.redemptionsWithData > 0) {
+    parts.push(
+      `Across ${formatAnalyticsNumber(people.redemptionsWithData)} redeemed vouchers`
+    );
+  }
+  if (people.children > 0 || people.adults > 0) {
+    const ageParts: string[] = [];
+    if (people.children > 0) {
+      ageParts.push(`${formatAnalyticsNumber(people.children)} children (0–17)`);
+    }
+    if (people.adults > 0) {
+      ageParts.push(`${formatAnalyticsNumber(people.adults)} adults (18+)`);
+    }
+    parts.push(ageParts.join(" · "));
+  }
+  if (people.redemptionsWithoutData > 0) {
+    parts.push(
+      `${formatAnalyticsNumber(people.redemptionsWithoutData)} redemptions without household data`
+    );
+  }
+  return parts.length ? parts.join(" · ") : "From household size at voucher issue";
 }
 
 function usersRoleSubtitle(byRole: AnalyticsData["users"]["byRole"]): string {
@@ -235,8 +262,9 @@ export default function AnalyticsPage() {
 
       {showContentSkeleton ? (
         <>
-          <KpiGridSkeleton count={5} />
-          <div className="grid gap-6 lg:grid-cols-2">
+          <KpiGridSkeleton count={6} />
+          <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
+            <ChartCardSkeleton />
             <ChartCardSkeleton />
             <ChartCardSkeleton />
           </div>
@@ -246,7 +274,7 @@ export default function AnalyticsPage() {
           <AnalyticsEmptyState label={data.period.label.toLowerCase()} />
         ) : (
           <>
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
               <KpiCard
                 title="Total users"
                 value={formatAnalyticsNumber(data.users.active)}
@@ -258,6 +286,12 @@ export default function AnalyticsPage() {
                 value={formatAnalyticsNumber(data.clientsServed.uniqueClients)}
                 subtitle={`${formatAnalyticsNumber(data.clientsServed.redemptions)} redemption events`}
                 icon={UserCheck}
+              />
+              <KpiCard
+                title="People served"
+                value={formatAnalyticsNumber(data.peopleServed.totalPeople)}
+                subtitle={peopleServedSubtitle(data.peopleServed)}
+                icon={UsersRound}
               />
               <KpiCard
                 title="Vouchers issued"
@@ -282,8 +316,9 @@ export default function AnalyticsPage() {
               />
             </div>
 
-            <div className="grid gap-6 lg:grid-cols-2">
+            <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
               <VoucherTrendChart data={data.timeSeries} />
+              <PeopleByAgeChart peopleServed={data.peopleServed} />
               <UsersByRoleChart byRole={data.users.byRole} />
             </div>
 

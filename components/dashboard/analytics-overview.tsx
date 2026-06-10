@@ -10,7 +10,7 @@ import type { AnalyticsOverviewData } from "@/lib/types";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import { KpiCard, KpiGridSkeleton } from "@/components/analytics/kpi-card";
-import { LineChart, Users, UserCheck, Ticket, Receipt, ArrowRight } from "lucide-react";
+import { LineChart, Users, UserCheck, UsersRound, Ticket, Receipt, ArrowRight } from "lucide-react";
 
 import { formatAnalyticsNumber } from "@/lib/analytics/format";
 
@@ -74,9 +74,9 @@ export function AnalyticsOverview() {
           </p>
         )}
         {loading && !data ? (
-          <KpiGridSkeleton count={4} />
+          <KpiGridSkeleton count={5} />
         ) : data ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <KpiCard
               title="Users"
               value={formatAnalyticsNumber(data.users.total)}
@@ -88,6 +88,16 @@ export function AnalyticsOverview() {
               value={formatAnalyticsNumber(data.clientsServed.uniqueClients)}
               subtitle="Unique clients with redemption"
               icon={UserCheck}
+            />
+            <KpiCard
+              title="People served"
+              value={formatAnalyticsNumber(data.peopleServed.totalPeople)}
+              subtitle={
+                data.peopleServed.totalPeople > 0
+                  ? `${formatAnalyticsNumber(data.peopleServed.children)} children · ${formatAnalyticsNumber(data.peopleServed.adults)} adults`
+                  : "From redeemed voucher household data"
+              }
+              icon={UsersRound}
             />
             <KpiCard
               title="Vouchers issued"

@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { aggregatePeopleFromRedemptions } from "@/lib/analytics/household";
 import { toDateOnlyUtc } from "@/lib/analytics/period";
 import type {
+  AnalyticsPeopleServed,
   ReportAgencyRow,
   ReportCenterRow,
   ReportIncomeSourceRow,
@@ -34,6 +36,7 @@ export interface AnalyticsTimeSeriesPoint {
 export interface OrganizationAnalyticsResult {
   users: AnalyticsUsersResult;
   clientsServed: AnalyticsClientsServedResult;
+  peopleServed: AnalyticsPeopleServed;
   vouchers: AnalyticsVouchersResult;
   timeSeries: AnalyticsTimeSeriesPoint[];
   byAgency: ReportAgencyRow[];
@@ -109,6 +112,29 @@ async function getClientsServedAnalytics(
   ).size;
 
   return { uniqueClients, redemptions };
+}
+
+async function getPeopleServedAnalytics(
+  organizationId: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<AnalyticsPeopleServed> {
+  const redemptions = await db.redemption.findMany({
+    where: redemptionWhere(organizationId, fromDate, toDate),
+    select: {
+      voucher: {
+        select: {
+          referralDetails: { select: { householdByAge: true } },
+        },
+      },
+    },
+  });
+
+  const households = redemptions.map(
+    (r) => r.voucher.referralDetails?.householdByAge ?? null
+  );
+
+  return aggregatePeopleFromRedemptions(households);
 }
 
 async function getVouchersAnalytics(
@@ -368,6 +394,7 @@ export async function getOrganizationAnalytics(
   const [
     users,
     clientsServed,
+    peopleServed,
     vouchers,
     timeSeries,
     byAgency,
@@ -376,6 +403,7 @@ export async function getOrganizationAnalytics(
   ] = await Promise.all([
     getUsersAnalytics(organizationId),
     getClientsServedAnalytics(organizationId, fromDate, toDate),
+    getPeopleServedAnalytics(organizationId, fromDate, toDate),
     getVouchersAnalytics(organizationId, fromDate, toDate),
     getTimeSeriesAnalytics(organizationId, fromDate, toDate),
     getByAgencyAnalytics(organizationId, fromDate, toDate),
@@ -386,6 +414,7 @@ export async function getOrganizationAnalytics(
   return {
     users,
     clientsServed,
+    peopleServed,
     vouchers,
     timeSeries,
     byAgency,
@@ -397,6 +426,7 @@ export async function getOrganizationAnalytics(
 export interface OrganizationAnalyticsOverviewResult {
   users: { total: number };
   clientsServed: { uniqueClients: number };
+  peopleServed: { totalPeople: number; children: number; adults: number };
   vouchers: { issued: number; redeemed: number };
 }
 
@@ -408,15 +438,21 @@ export async function getOrganizationAnalyticsOverview(
   fromDate: Date,
   toDate: Date
 ): Promise<OrganizationAnalyticsOverviewResult> {
-  const [users, clientsServed, vouchers] = await Promise.all([
+  const [users, clientsServed, peopleServed, vouchers] = await Promise.all([
     getUsersAnalytics(organizationId),
     getClientsServedAnalytics(organizationId, fromDate, toDate),
+    getPeopleServedAnalytics(organizationId, fromDate, toDate),
     getVouchersAnalytics(organizationId, fromDate, toDate),
   ]);
 
   return {
     users: { total: users.active },
     clientsServed: { uniqueClients: clientsServed.uniqueClients },
+    peopleServed: {
+      totalPeople: peopleServed.totalPeople,
+      children: peopleServed.children,
+      adults: peopleServed.adults,
+    },
     vouchers: {
       issued: vouchers.issued,
       redeemed: clientsServed.redemptions,
