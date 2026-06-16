@@ -191,6 +191,14 @@ export async function POST(req: NextRequest) {
     payload.householdChild != null && typeof payload.householdChild === "object"
       ? (payload.householdChild as Record<string, number>)
       : null;
+  const ethnicGroup =
+    typeof payload.ethnicGroup === "string" && payload.ethnicGroup.trim()
+      ? payload.ethnicGroup.trim()
+      : null;
+  const householdByAge =
+    payload.householdByAge != null && typeof payload.householdByAge === "object"
+      ? (payload.householdByAge as Record<string, number>)
+      : null;
 
   const yearOfBirthVal = yearOfBirth != null && !Number.isNaN(yearOfBirth) ? yearOfBirth : null;
   const postcodeNormalized =
@@ -236,6 +244,8 @@ export async function POST(req: NextRequest) {
       yearOfBirth: yearOfBirthVal,
       householdAdults: householdAdults ?? undefined,
       householdChild: householdChild ?? undefined,
+      ethnicGroup: ethnicGroup ?? undefined,
+      householdByAge: householdByAge ?? undefined,
     },
   });
 

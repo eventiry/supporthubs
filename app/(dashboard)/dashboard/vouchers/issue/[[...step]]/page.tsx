@@ -30,25 +30,21 @@ import {
 } from "@/components/dialog";
 import { CreateClientForm } from "@/components/create-client-form";
 import { CenterForm } from "@/components/center-form";
+import { ETHNIC_GROUP_OPTIONS } from "@/lib/client-demographics";
+import { HOUSEHOLD_AGE_BANDS } from "@/lib/analytics/household";
+import {
+  MoreThan3VouchersReasonFields,
+  hasMoreThan3VouchersReason,
+  buildMultiSelectWithOther,
+  parseMultiSelectWithOther,
+  MORE_THAN_3_OTHER_LABEL,
+} from "@/components/vouchers/more-than-3-vouchers-reason";
 
 const STEPS = 6;
 const NOTES_MAX = 400;
 const PARCEL_NOTES_MAX = 400;
-
-/** Reason for needing more than 3 vouchers in 6 months — multi-select options (from reference). */
-const MORE_THAN_3_REASON_OPTIONS = [
-  "Awaiting first benefit payment",
-  "Benefit delay or sanction",
-  "Debt",
-  "Domestic abuse",
-  "Drug or alcohol dependency",
-  "Homelessness",
-  "Long term health condition",
-  "Long term unemployment",
-  "No access to financial support due to immigration status",
-  "Other - low income",
-] as const;
-const MORE_THAN_3_OTHER_LABEL = "Other";
+const MORE_THAN_3_VOUCHERS_ERROR =
+  "3 or more vouchers in the last 6 months";
 
 /** Dietary requirements — multi-select options. */
 const DIETARY_OPTIONS = [
@@ -73,76 +69,6 @@ const INCOME_SOURCE_OPTIONS = [
   "Unable to ask",
 ] as const;
 const INCOME_SOURCE_OTHER_LABEL = "Other";
-
-/** Age bands for "number of people the voucher is for (by age group)". */
-const HOUSEHOLD_AGE_BANDS = [
-  "0-17",
-  "18-24",
-  "25-44",
-  "45-64",
-  "65+",
-] as const;
-
-/** Ethnic group — single-select options (UK ONS-style categories). */
-const ETHNIC_GROUP_OPTIONS = [
-  "White: English, Welsh, Scottish, Northern Irish or British",
-  "White: Irish",
-  "White: Gypsy or Irish Traveller",
-  "White: Roma",
-  "White: Other",
-  "Mixed or Multiple: White and Black Caribbean",
-  "Mixed or Multiple: White and Black African",
-  "Mixed or Multiple: White and Asian",
-  "Mixed or Multiple: Other",
-  "Asian or Asian British: Indian",
-  "Asian or Asian British: Pakistani",
-  "Asian or Asian British: Bangladeshi",
-  "Asian or Asian British: Chinese",
-  "Asian or Asian British: Other",
-  "Black, Black British, Caribbean or African: African",
-  "Black, Black British, Caribbean or African: Caribbean",
-  "Black, Black British, Caribbean or African: Other",
-  "Other: Arab",
-  "Other: Any other ethnic group",
-  "Prefer not to say",
-] as const;
-
-function parseMultiSelectWithOther(
-  value: string | undefined,
-  options: readonly string[],
-  otherLabel: string
-): { selected: Set<string>; otherText: string } {
-  const selected = new Set<string>();
-  let otherText = "";
-  const str = (value ?? "").trim();
-  if (!str) return { selected, otherText };
-  const parts = str.split(/\s*,\s*/);
-  for (const p of parts) {
-    if (p === otherLabel) {
-      selected.add(otherLabel);
-    } else if (p.startsWith(otherLabel + ":")) {
-      selected.add(otherLabel);
-      otherText = p.slice((otherLabel + ":").length).trim();
-    } else if (options.includes(p)) {
-      selected.add(p);
-    }
-  }
-  return { selected, otherText };
-}
-
-function buildMultiSelectWithOther(
-  selected: Set<string>,
-  otherText: string,
-  otherLabel: string
-): string {
-  const list = [...selected].filter((x) => x !== otherLabel);
-  if (selected.has(otherLabel) && otherText.trim()) {
-    list.push(`${otherLabel}: ${otherText.trim()}`);
-  } else if (selected.has(otherLabel)) {
-    list.push(otherLabel);
-  }
-  return list.join(", ");
-}
 
 const NA_LABEL = "N/A";
 
@@ -192,17 +118,50 @@ export default function IssueVoucherWizardPage() {
   const [addCenterLoading, setAddCenterLoading] = useState(false);
   const [addCenterError, setAddCenterError] = useState<string | null>(null);
 
+  function prefillReferralFromClient(client: ClientWithVouchers) {
+    setReferral((r) => ({
+      ...r,
+      ...(client.ethnicGroup ? { ethnicGroup: client.ethnicGroup } : {}),
+      ...(client.householdByAge != null && typeof client.householdByAge === "object"
+        ? { householdByAge: client.householdByAge as Record<string, number> }
+        : {}),
+    }));
+  }
+
+  async function loadClientForIssue(client: ClientWithVouchers, countFromSearch?: number) {
+    setSelectedClient(client);
+    const count =
+      countFromSearch ??
+      client.vouchersInLast6Months ??
+      (await api.clients.get(client.id)).vouchersInLast6Months ??
+      0;
+    setVouchersInLast6Months(count);
+    prefillReferralFromClient(client);
+  }
+
   useEffect(() => {
     if (clientIdParam && !selectedClient) {
       api.clients
         .get(clientIdParam)
-        .then((c) => {
-          setSelectedClient(c);
+        .then(async (c) => {
+          await loadClientForIssue(c);
           setStep(2);
         })
         .catch(() => {});
     }
   }, [clientIdParam, selectedClient]);
+
+  useEffect(() => {
+    if (step === 3 && selectedClient?.id) {
+      api.clients
+        .get(selectedClient.id)
+        .then((c) => {
+          setVouchersInLast6Months(c.vouchersInLast6Months ?? 0);
+          prefillReferralFromClient(c);
+        })
+        .catch(() => {});
+    }
+  }, [step, selectedClient?.id]);
 
   useEffect(() => {
     api.agencies.list().then(setAgencies).catch(() => {});
@@ -271,10 +230,13 @@ export default function IssueVoucherWizardPage() {
 
   async function selectClient(row: ClientSearchResult) {
     const c = await api.clients.get(row.id);
-    setSelectedClient(c);
-    setVouchersInLast6Months(row.vouchersInLast6Months);
+    await loadClientForIssue(c, row.vouchersInLast6Months);
     setSearchResults(null);
     setStep(2);
+  }
+
+  function requiresMoreThan3Reason(): boolean {
+    return vouchersInLast6Months >= 3;
   }
 
   function canProceedFromStep(s: number): boolean {
@@ -282,11 +244,27 @@ export default function IssueVoucherWizardPage() {
     if (s === 3) {
       const notesOk = referral.notes.length <= NOTES_MAX;
       const consentOk = selectedOrgsRules ? true : referral.contactConsent && referral.dietaryConsent;
-      return notesOk && consentOk && (vouchersInLast6Months < 3 || (referral.moreThan3VouchersReason ?? "").trim().length > 0);
+      return (
+        notesOk &&
+        consentOk &&
+        (!requiresMoreThan3Reason() || hasMoreThan3VouchersReason(referral.moreThan3VouchersReason))
+      );
     }
     if (s === 4) return !!agencyId && !!issueDate && (selectedOrgsRules || !!expiryDate);
     if (s === 5) return !!foodBankCenterId;
     return true;
+  }
+
+  function goToConfirmStep() {
+    setSubmitError(null);
+    if (requiresMoreThan3Reason() && !hasMoreThan3VouchersReason(referral.moreThan3VouchersReason)) {
+      setSubmitError(
+        "This client needs a reason for another voucher (3 or more in the last 6 months). Please complete the section below or go back to Step 3."
+      );
+      setStep(6);
+      return;
+    }
+    setStep(6);
   }
 
   async function handleAddAgency(e: React.FormEvent) {
@@ -380,6 +358,7 @@ export default function IssueVoucherWizardPage() {
           parcelNotes: referral.parcelNotes?.slice(0, PARCEL_NOTES_MAX),
           incomeSource: incomeForPayload,
           dietaryRequirements: dietaryForPayload,
+          moreThan3VouchersReason: referral.moreThan3VouchersReason,
         },
         issueDate: issueDateIso,
         expiryDate: expiryForPayload,
@@ -394,7 +373,14 @@ export default function IssueVoucherWizardPage() {
       setCreatedCode(v.code);
       setStep(6);
     } catch (err) {
-      setSubmitError(getErrorMessage(err));
+      const msg = getErrorMessage(err);
+      setSubmitError(msg);
+      if (msg.includes(MORE_THAN_3_VOUCHERS_ERROR) && selectedClient) {
+        api.clients
+          .get(selectedClient.id)
+          .then((c) => setVouchersInLast6Months(c.vouchersInLast6Months ?? 3))
+          .catch(() => setVouchersInLast6Months((n) => Math.max(n, 3)));
+      }
     } finally {
       setSubmitLoading(false);
     }
@@ -522,8 +508,7 @@ export default function IssueVoucherWizardPage() {
           <CreateClientForm
             onSuccess={async (client) => {
               const full = await api.clients.get(client.id);
-              setSelectedClient(full);
-              setVouchersInLast6Months(0);
+              await loadClientForIssue(full, 0);
               setStep(2);
               setCreateClientDialogOpen(false);
             }}
@@ -546,7 +531,7 @@ export default function IssueVoucherWizardPage() {
               client={selectedClient}
               onSuccess={async (client) => {
                 const full = await api.clients.get(client.id);
-                setSelectedClient(full);
+                await loadClientForIssue(full, full.vouchersInLast6Months);
                 setEditClientDialogOpen(false);
               }}
               onCancel={() => setEditClientDialogOpen(false)}
@@ -668,6 +653,12 @@ export default function IssueVoucherWizardPage() {
                 : selectedClient.postcode ?? "—"}
               {selectedClient.address && ` · ${selectedClient.address}`}
             </p>
+            {vouchersInLast6Months >= 3 && (
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
+                This client has {vouchersInLast6Months} vouchers in the last 6 months. You
+                will need to provide a reason on the next step before issuing another voucher.
+              </p>
+            )}
             <Button
               type="button"
               variant="default"
@@ -688,11 +679,6 @@ export default function IssueVoucherWizardPage() {
 
       {/* Step 3: Reason for referral */}
       {step === 3 && (() => {
-        const moreThan3Parsed = parseMultiSelectWithOther(
-          referral.moreThan3VouchersReason,
-          [...MORE_THAN_3_REASON_OPTIONS],
-          MORE_THAN_3_OTHER_LABEL
-        );
         const dietaryParsed = parseMultiSelectWithOther(
           referral.dietaryRequirements,
           [...DIETARY_OPTIONS],
@@ -792,84 +778,13 @@ export default function IssueVoucherWizardPage() {
                 </div>
               </div>
 
-              {vouchersInLast6Months >= 3 && (
-                <div className="space-y-2">
-                  <Label>Reason for needing more than 3 vouchers in the last 6 months *</Label>
-                  <p className="text-sm text-muted-foreground">
-                    This client has been issued 3 vouchers in the last 6 months. Please select all that apply.
-                  </p>
-                  <div className="space-y-2 rounded-md border border-input p-3">
-                    {MORE_THAN_3_REASON_OPTIONS.map((opt) => (
-                      <div key={opt} className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id={`more3-${opt.replace(/\s/g, "-")}`}
-                          checked={moreThan3Parsed.selected.has(opt)}
-                          onChange={(e) => {
-                            const newSelected = new Set(moreThan3Parsed.selected);
-                            if (e.target.checked) newSelected.add(opt);
-                            else newSelected.delete(opt);
-                            setReferral((r) => ({
-                              ...r,
-                              moreThan3VouchersReason: buildMultiSelectWithOther(
-                                newSelected,
-                                moreThan3Parsed.otherText,
-                                MORE_THAN_3_OTHER_LABEL
-                              ),
-                            }));
-                          }}
-                          className="h-4 w-4 rounded border-input"
-                        />
-                        <Label htmlFor={`more3-${opt.replace(/\s/g, "-")}`} className="font-normal cursor-pointer">
-                          {opt}
-                        </Label>
-                      </div>
-                    ))}
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="checkbox"
-                        id="more3-Other"
-                        checked={moreThan3Parsed.selected.has(MORE_THAN_3_OTHER_LABEL)}
-                        onChange={(e) => {
-                          const newSelected = new Set(moreThan3Parsed.selected);
-                          if (e.target.checked) newSelected.add(MORE_THAN_3_OTHER_LABEL);
-                          else newSelected.delete(MORE_THAN_3_OTHER_LABEL);
-                          setReferral((r) => ({
-                            ...r,
-                            moreThan3VouchersReason: buildMultiSelectWithOther(
-                              newSelected,
-                              moreThan3Parsed.otherText,
-                              MORE_THAN_3_OTHER_LABEL
-                            ),
-                          }));
-                        }}
-                        className="h-4 w-4 rounded border-input"
-                      />
-                      <Label htmlFor="more3-Other" className="font-normal cursor-pointer">
-                        {MORE_THAN_3_OTHER_LABEL}
-                      </Label>
-                    </div>
-                    {moreThan3Parsed.selected.has(MORE_THAN_3_OTHER_LABEL) && (
-                      <div className="ml-6">
-                        <Input
-                          placeholder="If you select Other, add details here"
-                          value={moreThan3Parsed.otherText}
-                          onChange={(e) => {
-                            setReferral((r) => ({
-                              ...r,
-                              moreThan3VouchersReason: buildMultiSelectWithOther(
-                                moreThan3Parsed.selected,
-                                e.target.value,
-                                MORE_THAN_3_OTHER_LABEL
-                              ),
-                            }));
-                          }}
-                        />
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
+              <MoreThan3VouchersReasonFields
+                value={referral.moreThan3VouchersReason}
+                onChange={(value) =>
+                  setReferral((r) => ({ ...r, moreThan3VouchersReason: value }))
+                }
+                vouchersInLast6Months={vouchersInLast6Months}
+              />
 
               <div className="space-y-2">
                 <Label>Dietary requirements (optional)</Label>
@@ -1184,7 +1099,7 @@ export default function IssueVoucherWizardPage() {
                 Back
               </Button>
               <Button
-                onClick={() => setStep(6)}
+                onClick={goToConfirmStep}
                 disabled={!canProceedFromStep(5)}
               >
                 Next
@@ -1261,14 +1176,35 @@ export default function IssueVoucherWizardPage() {
                     <p><span className="font-medium text-muted-foreground">Dietary consent:</span> {referral.dietaryConsent ? "Yes" : "No"}</p>
                   </section>
                 </div>
+                <MoreThan3VouchersReasonFields
+                  value={referral.moreThan3VouchersReason}
+                  onChange={(value) => {
+                    setSubmitError(null);
+                    setReferral((r) => ({ ...r, moreThan3VouchersReason: value }));
+                  }}
+                  vouchersInLast6Months={vouchersInLast6Months}
+                />
                 {submitError && (
                   <p className="text-sm text-destructive">{submitError}</p>
                 )}
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-2">
                   <Button onClick={() => setStep(5)} variant="outline">
                     Back
                   </Button>
-                  <Button onClick={handleSubmit} disabled={submitLoading}>
+                  {requiresMoreThan3Reason() &&
+                    !hasMoreThan3VouchersReason(referral.moreThan3VouchersReason) && (
+                      <Button onClick={() => setStep(3)} variant="outline">
+                        Edit referral (step 3)
+                      </Button>
+                    )}
+                  <Button
+                    onClick={handleSubmit}
+                    disabled={
+                      submitLoading ||
+                      (requiresMoreThan3Reason() &&
+                        !hasMoreThan3VouchersReason(referral.moreThan3VouchersReason))
+                    }
+                  >
                     {submitLoading ? "Creating…" : "Create voucher"}
                   </Button>
                 </div>

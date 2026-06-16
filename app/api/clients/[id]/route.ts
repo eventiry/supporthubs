@@ -37,6 +37,15 @@ export async function GET(
     return NextResponse.json({ message: "Client not found" }, { status: 404 });
   }
 
+  const sixMonthsAgo = new Date(Date.now() - 183 * 24 * 60 * 60 * 1000);
+  const vouchersInLast6Months = await db.voucher.count({
+    where: {
+      clientId: id,
+      organizationId: tenant.organizationId,
+      issueDate: { gte: sixMonthsAgo },
+    },
+  });
+
   const vouchers: VoucherSummary[] = client.vouchers.map((v) => ({
     id: v.id,
     code: v.code,
@@ -52,6 +61,7 @@ export async function GET(
   return NextResponse.json({
     ...client,
     vouchers,
+    vouchersInLast6Months,
   });
 }
 
@@ -129,6 +139,18 @@ export async function PATCH(
     data.householdChild =
       payload.householdChild != null && typeof payload.householdChild === "object"
         ? (payload.householdChild as object)
+        : Prisma.JsonNull;
+  }
+  if (payload.ethnicGroup !== undefined) {
+    data.ethnicGroup =
+      typeof payload.ethnicGroup === "string" && payload.ethnicGroup.trim()
+        ? payload.ethnicGroup.trim()
+        : null;
+  }
+  if (payload.householdByAge !== undefined) {
+    data.householdByAge =
+      payload.householdByAge != null && typeof payload.householdByAge === "object"
+        ? (payload.householdByAge as object)
         : Prisma.JsonNull;
   }
 

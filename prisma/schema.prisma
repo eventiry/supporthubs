@@ -256,6 +256,8 @@ model Client {
   yearOfBirth     Int?
   householdAdults Json?
   householdChild  Json?
+  ethnicGroup     String?
+  householdByAge  Json?
   organizationId  String
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt

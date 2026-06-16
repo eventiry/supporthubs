@@ -1,0 +1,23 @@
+/** UK ONS-style ethnic group options (shared by client forms and voucher issue). */
+export const ETHNIC_GROUP_OPTIONS = [
+  "White: English, Welsh, Scottish, Northern Irish or British",
+  "White: Irish",
+  "White: Gypsy or Irish Traveller",
+  "White: Roma",
+  "White: Other",
+  "Mixed or Multiple: White and Black Caribbean",
+  "Mixed or Multiple: White and Black African",
+  "Mixed or Multiple: White and Asian",
+  "Mixed or Multiple: Other",
+  "Asian or Asian British: Indian",
+  "Asian or Asian British: Pakistani",
+  "Asian or Asian British: Bangladeshi",
+  "Asian or Asian British: Chinese",
+  "Asian or Asian British: Other",
+  "Black, Black British, Caribbean or African: African",
+  "Black, Black British, Caribbean or African: Caribbean",
+  "Black, Black British, Caribbean or African: Other",
+  "Other: Arab",
+  "Other: Any other ethnic group",
+  "Prefer not to say",
+] as const;

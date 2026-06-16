@@ -9,11 +9,24 @@ import { Button } from "@/components/button";
 import { Input } from "@/components/input";
 import { Label } from "@/components/label";
 import { PostcodeLookup } from "@/components/postcode-lookup";
+import { ETHNIC_GROUP_OPTIONS } from "@/lib/client-demographics";
+import {
+  HOUSEHOLD_AGE_BANDS,
+  parseHouseholdByAge,
+} from "@/lib/analytics/household";
 
 /** Client-like shape for form (create or edit). */
 type ClientFormClient = Pick<
   Client,
-  "id" | "firstName" | "surname" | "postcode" | "noFixedAddress" | "address" | "yearOfBirth"
+  | "id"
+  | "firstName"
+  | "surname"
+  | "postcode"
+  | "noFixedAddress"
+  | "address"
+  | "yearOfBirth"
+  | "ethnicGroup"
+  | "householdByAge"
 >;
 
 export interface CreateClientFormProps {
@@ -45,6 +58,8 @@ export function CreateClientForm({
   const [noFixedAddress, setNoFixedAddress] = useState(false);
   const [address, setAddress] = useState("");
   const [yearOfBirth, setYearOfBirth] = useState("");
+  const [ethnicGroup, setEthnicGroup] = useState("");
+  const [householdByAge, setHouseholdByAge] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -58,12 +73,23 @@ export function CreateClientForm({
       setYearOfBirth(
         initialClient.yearOfBirth != null ? String(initialClient.yearOfBirth) : ""
       );
+      setEthnicGroup(initialClient.ethnicGroup ?? "");
+      setHouseholdByAge(parseHouseholdByAge(initialClient.householdByAge));
     }
   }, [initialClient]);
 
   const isEdit = !!initialClient?.id;
   const defaultSubmitLabel = isEdit ? "Save changes" : "Create client";
   const label = submitLabel ?? defaultSubmitLabel;
+
+  function householdPayload(): Record<string, number> | undefined {
+    const bands = HOUSEHOLD_AGE_BANDS.map((band) => ({
+      band,
+      count: householdByAge[band] ?? 0,
+    })).filter((row) => row.count > 0);
+    if (bands.length === 0) return undefined;
+    return Object.fromEntries(bands.map((row) => [row.band, row.count]));
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -87,6 +113,8 @@ export function CreateClientForm({
       yearOfBirth: yearOfBirth.trim()
         ? parseInt(yearOfBirth, 10)
         : undefined,
+      ethnicGroup: ethnicGroup.trim() || undefined,
+      householdByAge: householdPayload(),
     };
     setLoading(true);
     try {
@@ -173,6 +201,53 @@ export function CreateClientForm({
           placeholder="e.g. 1985"
           disabled={loading}
         />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="create-client-ethnicGroup">Ethnic group (optional)</Label>
+        <select
+          id="create-client-ethnicGroup"
+          className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm"
+          value={ethnicGroup}
+          onChange={(e) => setEthnicGroup(e.target.value)}
+          disabled={loading}
+        >
+          <option value="">Select ethnic group</option>
+          {ETHNIC_GROUP_OPTIONS.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>People in household by age (optional)</Label>
+        <p className="text-sm text-muted-foreground">
+          Saved on the client record and pre-filled when you issue vouchers.
+        </p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {HOUSEHOLD_AGE_BANDS.map((band) => (
+            <div key={band} className="flex items-center gap-2">
+              <Label htmlFor={`create-client-household-${band}`} className="shrink-0 text-sm">
+                {band}yrs
+              </Label>
+              <Input
+                id={`create-client-household-${band}`}
+                type="number"
+                min={0}
+                max={99}
+                value={householdByAge[band] ?? 0}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10);
+                  const n = Number.isNaN(v) ? 0 : Math.max(0, Math.min(99, v));
+                  setHouseholdByAge((prev) => ({ ...prev, [band]: n }));
+                }}
+                disabled={loading}
+              />
+            </div>
+          ))}
+        </div>
       </div>
 
       {error && (

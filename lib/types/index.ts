@@ -444,6 +444,8 @@ export interface ClientCreatePayload {
   noFixedAddress?: boolean;
   address?: string;
   yearOfBirth?: number;
+  ethnicGroup?: string;
+  householdByAge?: Record<string, number>;
   householdAdults?: Record<string, number>;
   householdChild?: Record<string, number>;
 }
@@ -453,6 +455,7 @@ export type ClientUpdatePayload = Partial<ClientCreatePayload>;
 /** Client with recent vouchers (for GET by id) */
 export interface ClientWithVouchers extends Omit<Client, "vouchers"> {
   vouchers: VoucherSummary[];
+  vouchersInLast6Months?: number;
 }
 
 // ----- Referral details (for voucher issuance) -----
