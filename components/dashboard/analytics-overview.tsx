@@ -10,9 +10,9 @@ import type { AnalyticsOverviewData } from "@/lib/types";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import { KpiCard, KpiGridSkeleton } from "@/components/analytics/kpi-card";
-import { LineChart, Users, UserCheck, UsersRound, Ticket, Receipt, ArrowRight } from "lucide-react";
+import { LineChart, Users, UserCheck, UsersRound, Ticket, Receipt, ArrowRight, Scale } from "lucide-react";
 
-import { formatAnalyticsNumber } from "@/lib/analytics/format";
+import { formatAnalyticsNumber, formatAnalyticsWeightKg } from "@/lib/analytics/format";
 
 const OVERVIEW_PERIOD = "monthly" as const;
 
@@ -74,9 +74,9 @@ export function AnalyticsOverview() {
           </p>
         )}
         {loading && !data ? (
-          <KpiGridSkeleton count={5} />
+          <KpiGridSkeleton count={6} />
         ) : data ? (
-          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
             <KpiCard
               title="Users"
               value={formatAnalyticsNumber(data.users.total)}
@@ -98,6 +98,12 @@ export function AnalyticsOverview() {
                   : "From redeemed voucher household data"
               }
               icon={UsersRound}
+            />
+            <KpiCard
+              title="Food distributed"
+              value={formatAnalyticsWeightKg(data.foodDistributed.totalKg)}
+              subtitle="Weight at redemption in period"
+              icon={Scale}
             />
             <KpiCard
               title="Vouchers issued"

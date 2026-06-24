@@ -4,8 +4,13 @@ import {
   aggregatePeopleFromRedemptions,
   totalPeopleFromHousehold,
 } from "@/lib/analytics/household";
+import {
+  effectiveDistributionWeightKg,
+  roundKg,
+} from "@/lib/analytics/weight";
 import { toDateOnlyUtc } from "@/lib/analytics/period";
 import type {
+  AnalyticsFoodDistributed,
   AnalyticsPeopleServed,
   ReportAgencyRow,
   ReportCenterRow,
@@ -40,6 +45,7 @@ export interface OrganizationAnalyticsResult {
   users: AnalyticsUsersResult;
   clientsServed: AnalyticsClientsServedResult;
   peopleServed: AnalyticsPeopleServed;
+  foodDistributed: AnalyticsFoodDistributed;
   vouchers: AnalyticsVouchersResult;
   timeSeries: AnalyticsTimeSeriesPoint[];
   byAgency: ReportAgencyRow[];
@@ -138,6 +144,41 @@ async function getPeopleServedAnalytics(
   );
 
   return aggregatePeopleFromRedemptions(households);
+}
+
+async function getFoodDistributedAnalytics(
+  organizationId: string,
+  fromDate: Date,
+  toDate: Date
+): Promise<AnalyticsFoodDistributed> {
+  const redemptions = await db.redemption.findMany({
+    where: redemptionWhere(organizationId, fromDate, toDate),
+    select: {
+      weightKg: true,
+      voucher: { select: { weightKg: true } },
+    },
+  });
+
+  let totalKg = 0;
+  let redemptionsWithWeight = 0;
+  let redemptionsWithoutWeight = 0;
+
+  for (const r of redemptions) {
+    const weight = effectiveDistributionWeightKg(r.weightKg, r.voucher.weightKg);
+    if (weight != null) {
+      totalKg += weight;
+      redemptionsWithWeight += 1;
+    } else {
+      redemptionsWithoutWeight += 1;
+    }
+  }
+
+  return {
+    totalKg: roundKg(totalKg),
+    redemptions: redemptions.length,
+    redemptionsWithWeight,
+    redemptionsWithoutWeight,
+  };
 }
 
 async function getVouchersAnalytics(
@@ -302,7 +343,13 @@ async function getByAgencyAnalytics(
   const agencyNameById = new Map(agencies.map((a) => [a.id, a.name]));
   const byAgencyMap = new Map<
     string,
-    { agencyName: string; issued: number; redeemed: number; peopleServed: number }
+    {
+      agencyName: string;
+      issued: number;
+      redeemed: number;
+      peopleServed: number;
+      weightKg: number;
+    }
   >();
 
   for (const v of vouchers) {
@@ -312,6 +359,7 @@ async function getByAgencyAnalytics(
         issued: 0,
         redeemed: 0,
         peopleServed: 0,
+        weightKg: 0,
       });
     }
     const row = byAgencyMap.get(v.agencyId)!;
@@ -322,9 +370,11 @@ async function getByAgencyAnalytics(
   const redemptionRows = await db.redemption.findMany({
     where: redemptionWhere(organizationId, fromDate, toDate),
     select: {
+      weightKg: true,
       voucher: {
         select: {
           agencyId: true,
+          weightKg: true,
           referralDetails: { select: { householdByAge: true } },
         },
       },
@@ -336,7 +386,7 @@ async function getByAgencyAnalytics(
     const people = totalPeopleFromHousehold(
       r.voucher.referralDetails?.householdByAge
     );
-    if (people <= 0) continue;
+    const weight = effectiveDistributionWeightKg(r.weightKg, r.voucher.weightKg);
 
     if (!byAgencyMap.has(agencyId)) {
       byAgencyMap.set(agencyId, {
@@ -344,15 +394,21 @@ async function getByAgencyAnalytics(
         issued: 0,
         redeemed: 0,
         peopleServed: 0,
+        weightKg: 0,
       });
     }
-    byAgencyMap.get(agencyId)!.peopleServed += people;
+    const row = byAgencyMap.get(agencyId)!;
+    if (people > 0) row.peopleServed += people;
+    if (weight != null) row.weightKg += weight;
   }
 
   return Array.from(byAgencyMap.entries())
     .filter(
       ([, row]) =>
-        row.issued > 0 || row.redeemed > 0 || row.peopleServed > 0
+        row.issued > 0 ||
+        row.redeemed > 0 ||
+        row.peopleServed > 0 ||
+        row.weightKg > 0
     )
     .map(([agencyId, row]) => ({
       agencyId,
@@ -360,6 +416,7 @@ async function getByAgencyAnalytics(
       issued: row.issued,
       redeemed: row.redeemed,
       peopleServed: row.peopleServed,
+      weightKg: roundKg(row.weightKg),
     }))
     .sort(
       (a, b) =>
@@ -377,8 +434,10 @@ async function getByCenterAnalytics(
     where: redemptionWhere(organizationId, fromDate, toDate),
     select: {
       centerId: true,
+      weightKg: true,
       voucher: {
         select: {
+          weightKg: true,
           referralDetails: { select: { householdByAge: true } },
         },
       },
@@ -396,17 +455,19 @@ async function getByCenterAnalytics(
 
   const byCenterMap = new Map<
     string,
-    { redeemed: number; peopleServed: number }
+    { redeemed: number; peopleServed: number; weightKg: number }
   >();
   for (const r of redemptions) {
     if (!byCenterMap.has(r.centerId)) {
-      byCenterMap.set(r.centerId, { redeemed: 0, peopleServed: 0 });
+      byCenterMap.set(r.centerId, { redeemed: 0, peopleServed: 0, weightKg: 0 });
     }
     const row = byCenterMap.get(r.centerId)!;
     row.redeemed += 1;
     row.peopleServed += totalPeopleFromHousehold(
       r.voucher.referralDetails?.householdByAge
     );
+    const weight = effectiveDistributionWeightKg(r.weightKg, r.voucher.weightKg);
+    if (weight != null) row.weightKg += weight;
   }
 
   return Array.from(byCenterMap.entries())
@@ -415,8 +476,13 @@ async function getByCenterAnalytics(
       centerName: centerNameById.get(centerId) ?? "Unknown",
       redeemed: row.redeemed,
       peopleServed: row.peopleServed,
+      weightKg: roundKg(row.weightKg),
     }))
-    .sort((a, b) => b.redeemed + b.peopleServed - (a.redeemed + a.peopleServed));
+    .sort(
+      (a, b) =>
+        b.redeemed + b.peopleServed + b.weightKg -
+        (a.redeemed + a.peopleServed + a.weightKg)
+    );
 }
 
 function incomeSourceKey(incomeSource: string | null | undefined): string {
@@ -493,6 +559,7 @@ export async function getOrganizationAnalytics(
     users,
     clientsServed,
     peopleServed,
+    foodDistributed,
     vouchers,
     timeSeries,
     byAgency,
@@ -502,6 +569,7 @@ export async function getOrganizationAnalytics(
     getUsersAnalytics(organizationId),
     getClientsServedAnalytics(organizationId, fromDate, toDate),
     getPeopleServedAnalytics(organizationId, fromDate, toDate),
+    getFoodDistributedAnalytics(organizationId, fromDate, toDate),
     getVouchersAnalytics(organizationId, fromDate, toDate),
     getTimeSeriesAnalytics(organizationId, fromDate, toDate),
     getByAgencyAnalytics(organizationId, fromDate, toDate),
@@ -513,6 +581,7 @@ export async function getOrganizationAnalytics(
     users,
     clientsServed,
     peopleServed,
+    foodDistributed,
     vouchers,
     timeSeries,
     byAgency,
@@ -525,6 +594,7 @@ export interface OrganizationAnalyticsOverviewResult {
   users: { total: number };
   clientsServed: { uniqueClients: number };
   peopleServed: { totalPeople: number; children: number; adults: number };
+  foodDistributed: { totalKg: number };
   vouchers: { issued: number; redeemed: number };
 }
 
@@ -536,10 +606,12 @@ export async function getOrganizationAnalyticsOverview(
   fromDate: Date,
   toDate: Date
 ): Promise<OrganizationAnalyticsOverviewResult> {
-  const [users, clientsServed, peopleServed, vouchers] = await Promise.all([
+  const [users, clientsServed, peopleServed, foodDistributed, vouchers] =
+    await Promise.all([
     getUsersAnalytics(organizationId),
     getClientsServedAnalytics(organizationId, fromDate, toDate),
     getPeopleServedAnalytics(organizationId, fromDate, toDate),
+    getFoodDistributedAnalytics(organizationId, fromDate, toDate),
     getVouchersAnalytics(organizationId, fromDate, toDate),
   ]);
 
@@ -551,6 +623,7 @@ export async function getOrganizationAnalyticsOverview(
       children: peopleServed.children,
       adults: peopleServed.adults,
     },
+    foodDistributed: { totalKg: foodDistributed.totalKg },
     vouchers: {
       issued: vouchers.issued,
       redeemed: clientsServed.redemptions,

@@ -595,6 +595,7 @@ export interface ReportAgencyRow {
   issued: number;
   redeemed: number;
   peopleServed: number;
+  weightKg: number;
 }
 
 export interface ReportCenterRow {
@@ -602,6 +603,7 @@ export interface ReportCenterRow {
   centerName: string;
   redeemed: number;
   peopleServed: number;
+  weightKg: number;
 }
 
 export interface ReportIncomeSourceRow {
@@ -666,6 +668,14 @@ export interface AnalyticsPeopleServed {
   redemptionsWithoutData: number;
 }
 
+/** Food weight distributed at redemption (kg). */
+export interface AnalyticsFoodDistributed {
+  totalKg: number;
+  redemptions: number;
+  redemptionsWithWeight: number;
+  redemptionsWithoutWeight: number;
+}
+
 export interface AnalyticsVouchers {
   issued: number;
   redeemed: number;
@@ -684,6 +694,7 @@ export interface AnalyticsData {
   users: AnalyticsUsers;
   clientsServed: AnalyticsClientsServed;
   peopleServed: AnalyticsPeopleServed;
+  foodDistributed: AnalyticsFoodDistributed;
   vouchers: AnalyticsVouchers;
   timeSeries: AnalyticsTimeSeriesPoint[];
   byAgency: ReportAgencyRow[];
@@ -704,6 +715,7 @@ export interface AnalyticsOverviewData {
   users: { total: number };
   clientsServed: { uniqueClients: number };
   peopleServed: { totalPeople: number; children: number; adults: number };
+  foodDistributed: { totalKg: number };
   vouchers: { issued: number; redeemed: number };
 }
 

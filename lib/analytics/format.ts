@@ -5,6 +5,13 @@ export function formatAnalyticsNumber(value: number): string {
   return value.toLocaleString(ANALYTICS_LOCALE);
 }
 
+export function formatAnalyticsWeightKg(value: number): string {
+  return `${value.toLocaleString(ANALYTICS_LOCALE, {
+    minimumFractionDigits: value % 1 === 0 ? 0 : 1,
+    maximumFractionDigits: 1,
+  })} kg`;
+}
+
 export function formatAnalyticsPeriodRange(
   fromDate: string,
   toDate: string

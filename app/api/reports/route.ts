@@ -4,6 +4,10 @@ import { Permission } from "@/lib/rbac/permissions";
 import { db } from "@/lib/db";
 import { getSessionUserAndTenant } from "@/lib/api/get-session-and-tenant";
 import { totalPeopleFromHousehold } from "@/lib/analytics/household";
+import {
+  effectiveDistributionWeightKg,
+  roundKg,
+} from "@/lib/analytics/weight";
 
 function toDateOnly(d: Date): string {
   return d.toISOString().slice(0, 10);
@@ -75,9 +79,11 @@ export async function GET(req: NextRequest) {
       select: {
         voucherId: true,
         centerId: true,
+        weightKg: true,
         voucher: {
           select: {
             agencyId: true,
+            weightKg: true,
             referralDetails: {
               select: { incomeSource: true, householdByAge: true },
             },
@@ -98,7 +104,13 @@ export async function GET(req: NextRequest) {
   const agencyNameById = new Map(agencies.map((a) => [a.id, a.name]));
   const byAgencyMap = new Map<
     string,
-    { agencyName: string; issued: number; redeemed: number; peopleServed: number }
+    {
+      agencyName: string;
+      issued: number;
+      redeemed: number;
+      peopleServed: number;
+      weightKg: number;
+    }
   >();
   for (const v of vouchers) {
     if (!byAgencyMap.has(v.agencyId)) {
@@ -107,6 +119,7 @@ export async function GET(req: NextRequest) {
         issued: 0,
         redeemed: 0,
         peopleServed: 0,
+        weightKg: 0,
       });
     }
     const row = byAgencyMap.get(v.agencyId)!;
@@ -118,21 +131,27 @@ export async function GET(req: NextRequest) {
     const people = totalPeopleFromHousehold(
       r.voucher.referralDetails?.householdByAge
     );
-    if (people <= 0) continue;
+    const weight = effectiveDistributionWeightKg(r.weightKg, r.voucher.weightKg);
     if (!byAgencyMap.has(agencyId)) {
       byAgencyMap.set(agencyId, {
         agencyName: agencyNameById.get(agencyId) ?? "Unknown",
         issued: 0,
         redeemed: 0,
         peopleServed: 0,
+        weightKg: 0,
       });
     }
-    byAgencyMap.get(agencyId)!.peopleServed += people;
+    const row = byAgencyMap.get(agencyId)!;
+    if (people > 0) row.peopleServed += people;
+    if (weight != null) row.weightKg += weight;
   }
   const byAgency = Array.from(byAgencyMap.entries())
     .filter(
       ([, row]) =>
-        row.issued > 0 || row.redeemed > 0 || row.peopleServed > 0
+        row.issued > 0 ||
+        row.redeemed > 0 ||
+        row.peopleServed > 0 ||
+        row.weightKg > 0
     )
     .map(([agencyId, row]) => ({
       agencyId,
@@ -140,6 +159,7 @@ export async function GET(req: NextRequest) {
       issued: row.issued,
       redeemed: row.redeemed,
       peopleServed: row.peopleServed,
+      weightKg: roundKg(row.weightKg),
     }))
     .sort(
       (a, b) =>
@@ -158,17 +178,19 @@ export async function GET(req: NextRequest) {
   const centerNameById = new Map(centers.map((c) => [c.id, c.name]));
   const byCenterMap = new Map<
     string,
-    { redeemed: number; peopleServed: number }
+    { redeemed: number; peopleServed: number; weightKg: number }
   >();
   for (const r of redemptions) {
     if (!byCenterMap.has(r.centerId)) {
-      byCenterMap.set(r.centerId, { redeemed: 0, peopleServed: 0 });
+      byCenterMap.set(r.centerId, { redeemed: 0, peopleServed: 0, weightKg: 0 });
     }
     const row = byCenterMap.get(r.centerId)!;
     row.redeemed += 1;
     row.peopleServed += totalPeopleFromHousehold(
       r.voucher.referralDetails?.householdByAge
     );
+    const weight = effectiveDistributionWeightKg(r.weightKg, r.voucher.weightKg);
+    if (weight != null) row.weightKg += weight;
   }
   const byCenter = Array.from(byCenterMap.entries())
     .map(([centerId, row]) => ({
@@ -176,8 +198,13 @@ export async function GET(req: NextRequest) {
       centerName: centerNameById.get(centerId) ?? "Unknown",
       redeemed: row.redeemed,
       peopleServed: row.peopleServed,
+      weightKg: roundKg(row.weightKg),
     }))
-    .sort((a, b) => b.redeemed + b.peopleServed - (a.redeemed + a.peopleServed));
+    .sort(
+      (a, b) =>
+        b.redeemed + b.peopleServed + b.weightKg -
+        (a.redeemed + a.peopleServed + a.weightKg)
+    );
 
   const incomeSourceMap = new Map<
     string,
@@ -231,19 +258,21 @@ export async function GET(req: NextRequest) {
       ["Redeemed", String(data.redeemedCount)],
       ["Expired", String(data.expiredCount)],
       [],
-      ["Agency", "Issued", "Redeemed", "People served"],
+      ["Agency", "Issued", "Redeemed", "People served", "Food distributed (kg)"],
       ...data.byAgency.map((r) => [
         r.agencyName,
         String(r.issued),
         String(r.redeemed),
         String(r.peopleServed),
+        String(r.weightKg),
       ]),
       [],
-      ["Center", "Redeemed", "People served"],
+      ["Center", "Redeemed", "People served", "Food distributed (kg)"],
       ...data.byCenter.map((r) => [
         r.centerName,
         String(r.redeemed),
         String(r.peopleServed),
+        String(r.weightKg),
       ]),
       [],
       ["Income Source", "Vouchers", "People served"],

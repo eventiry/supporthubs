@@ -15,9 +15,14 @@ import {
 import {
   formatAnalyticsNumber,
   formatAnalyticsPeriodRange,
+  formatAnalyticsWeightKg,
 } from "@/lib/analytics/format";
 import { isAnalyticsDataEmpty } from "@/lib/analytics/empty-state";
-import type { AnalyticsData, AnalyticsPeopleServed } from "@/lib/types";
+import type {
+  AnalyticsData,
+  AnalyticsFoodDistributed,
+  AnalyticsPeopleServed,
+} from "@/lib/types";
 import { Button } from "@/components/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/card";
 import {
@@ -47,6 +52,7 @@ import {
   Percent,
   Download,
   BarChart3,
+  Scale,
 } from "lucide-react";
 
 function selectionFromSearchParams(
@@ -84,6 +90,21 @@ function peopleServedSubtitle(people: AnalyticsPeopleServed): string {
     );
   }
   return parts.length ? parts.join(" · ") : "From household size at voucher issue";
+}
+
+function foodDistributedSubtitle(food: AnalyticsFoodDistributed): string {
+  if (food.redemptionsWithWeight > 0) {
+    const parts = [
+      `From ${formatAnalyticsNumber(food.redemptionsWithWeight)} redemptions with weight`,
+    ];
+    if (food.redemptionsWithoutWeight > 0) {
+      parts.push(
+        `${formatAnalyticsNumber(food.redemptionsWithoutWeight)} without weight recorded`
+      );
+    }
+    return parts.join(" · ");
+  }
+  return "Recorded at issue or fulfillment";
 }
 
 function usersRoleSubtitle(byRole: AnalyticsData["users"]["byRole"]): string {
@@ -262,7 +283,7 @@ export default function AnalyticsPage() {
 
       {showContentSkeleton ? (
         <>
-          <KpiGridSkeleton count={6} />
+          <KpiGridSkeleton count={7} />
           <div className="grid gap-6 lg:grid-cols-2 xl:grid-cols-3">
             <ChartCardSkeleton />
             <ChartCardSkeleton />
@@ -292,6 +313,12 @@ export default function AnalyticsPage() {
                 value={formatAnalyticsNumber(data.peopleServed.totalPeople)}
                 subtitle={peopleServedSubtitle(data.peopleServed)}
                 icon={UsersRound}
+              />
+              <KpiCard
+                title="Food distributed"
+                value={formatAnalyticsWeightKg(data.foodDistributed.totalKg)}
+                subtitle={foodDistributedSubtitle(data.foodDistributed)}
+                icon={Scale}
               />
               <KpiCard
                 title="Vouchers issued"
@@ -328,7 +355,7 @@ export default function AnalyticsPage() {
                   <CardTitle className="text-base">By agency</CardTitle>
                   <p className="text-sm text-muted-foreground">
                     Issued and redeemed vouchers by referring agency, with people
-                    served from household data
+                    served and food weight from household and parcel data
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -344,6 +371,7 @@ export default function AnalyticsPage() {
                           <TableHead className="text-right">Issued</TableHead>
                           <TableHead className="text-right">Redeemed</TableHead>
                           <TableHead className="text-right">People served</TableHead>
+                          <TableHead className="text-right">Food (kg)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -359,6 +387,11 @@ export default function AnalyticsPage() {
                             <TableCell className="text-right tabular-nums">
                               {formatAnalyticsNumber(r.peopleServed)}
                             </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {r.weightKg > 0
+                                ? formatAnalyticsWeightKg(r.weightKg)
+                                : "—"}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -371,7 +404,7 @@ export default function AnalyticsPage() {
                 <CardHeader>
                   <CardTitle className="text-base">By food bank centre</CardTitle>
                   <p className="text-sm text-muted-foreground">
-                    Redemptions and people served at each centre
+                    Redemptions, people served, and food weight at each centre
                   </p>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -386,6 +419,7 @@ export default function AnalyticsPage() {
                           <TableHead>Centre</TableHead>
                           <TableHead className="text-right">Redeemed</TableHead>
                           <TableHead className="text-right">People served</TableHead>
+                          <TableHead className="text-right">Food (kg)</TableHead>
                         </TableRow>
                       </TableHeader>
                       <TableBody>
@@ -397,6 +431,11 @@ export default function AnalyticsPage() {
                             </TableCell>
                             <TableCell className="text-right tabular-nums">
                               {formatAnalyticsNumber(r.peopleServed)}
+                            </TableCell>
+                            <TableCell className="text-right tabular-nums">
+                              {r.weightKg > 0
+                                ? formatAnalyticsWeightKg(r.weightKg)
+                                : "—"}
                             </TableCell>
                           </TableRow>
                         ))}
