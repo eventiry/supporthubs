@@ -40,22 +40,60 @@ async function generateUniqueVoucherCode(): Promise<string> {
   throw new Error("Could not generate unique voucher code");
 }
 
+function incrementalCodePrefix(organizationId: string): string {
+  const idx = SELECTED_ORGS.indexOf(organizationId);
+  return `E-${String(idx >= 0 ? idx + 1 : 1).padStart(3, "0")}`;
+}
+
+function parseIncrementalSequence(code: string, prefix: string): number | null {
+  const expectedPrefix = `${prefix}-`;
+  if (!code.startsWith(expectedPrefix)) return null;
+  const suffix = code.slice(expectedPrefix.length);
+  if (!/^\d+$/.test(suffix)) return null;
+  return parseInt(suffix, 10);
+}
+
 /** For selected-orgs: E-001-0001, E-001-0002, ... (org index 001, 4-digit sequence per org). */
 async function generateIncrementalVoucherCode(organizationId: string): Promise<string> {
-  const idx = SELECTED_ORGS.indexOf(organizationId);
-  const prefix = `E-${String(idx >= 0 ? idx + 1 : 1).padStart(3, "0")}`;
-  const count = await db.voucher.count({
-    where: {
-      organizationId,
-      code: { startsWith: prefix + "-" },
-    },
-  });
-  const seq = count + 1;
-  const code = `${prefix}-${String(seq).padStart(4, "0")}`;
-  const existing = await db.voucher.findUnique({ where: { code } });
-  if (existing) throw new Error("Voucher code collision");
-  return code;
+  const prefix = incrementalCodePrefix(organizationId);
+
+  for (let attempt = 0; attempt < 20; attempt++) {
+    const latest = await db.voucher.findFirst({
+      where: {
+        organizationId,
+        code: { startsWith: `${prefix}-` },
+      },
+      orderBy: { code: "desc" },
+      select: { code: true },
+    });
+
+    let nextSeq = 1;
+    if (latest) {
+      const currentSeq = parseIncrementalSequence(latest.code, prefix);
+      if (currentSeq != null) nextSeq = currentSeq + 1;
+    }
+    nextSeq += attempt;
+
+    const code = `${prefix}-${String(nextSeq).padStart(4, "0")}`;
+    const existing = await db.voucher.findUnique({ where: { code } });
+    if (!existing) return code;
+  }
+
+  throw new Error("Could not generate unique voucher code");
 }
+
+function isPrismaUniqueViolationOnCode(error: unknown): boolean {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "P2002" &&
+    "meta" in error &&
+    typeof (error as { meta?: { target?: unknown } }).meta?.target !== "undefined"
+  );
+}
+
+const VOUCHER_CODE_CREATE_ATTEMPTS = 5;
 
 export async function GET(req: NextRequest) {
   const out = await getSessionUserAndTenant(req);
@@ -284,28 +322,55 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  const code = selectedOrgsRules
-    ? await generateIncrementalVoucherCode(tenant.organizationId)
-    : await generateUniqueVoucherCode();
+  const codeGenerator = selectedOrgsRules
+    ? () => generateIncrementalVoucherCode(tenant.organizationId)
+    : () => generateUniqueVoucherCode();
 
-  const voucher = await db.voucher.create({
-    data: {
-      code,
-      organizationId: tenant.organizationId,
-      clientId,
-      agencyId,
-      referralDetailsId: referralRecord.id,
-      foodBankCenterId: foodBankCenterId ?? undefined,
-      issueDate,
-      expiryDate,
-      issuedById: user.id,
-      collectionNotes: selectedOrgsRules ? undefined : collectionNotes,
-      weightKg: weightKg ?? undefined,
-    },
-    include: {
-      client: { select: { firstName: true, surname: true } },
-    },
-  });
+  let voucher;
+  for (let attempt = 0; attempt < VOUCHER_CODE_CREATE_ATTEMPTS; attempt++) {
+    let code: string;
+    try {
+      code = await codeGenerator();
+    } catch {
+      return NextResponse.json(
+        { message: "Could not generate a unique voucher code. Please try again." },
+        { status: 503 }
+      );
+    }
+
+    try {
+      voucher = await db.voucher.create({
+        data: {
+          code,
+          organizationId: tenant.organizationId,
+          clientId,
+          agencyId,
+          referralDetailsId: referralRecord.id,
+          foodBankCenterId: foodBankCenterId ?? undefined,
+          issueDate,
+          expiryDate,
+          issuedById: user.id,
+          collectionNotes: selectedOrgsRules ? undefined : collectionNotes,
+          weightKg: weightKg ?? undefined,
+        },
+        include: {
+          client: { select: { firstName: true, surname: true } },
+        },
+      });
+      break;
+    } catch (error) {
+      if (!isPrismaUniqueViolationOnCode(error) || attempt === VOUCHER_CODE_CREATE_ATTEMPTS - 1) {
+        throw error;
+      }
+    }
+  }
+
+  if (!voucher) {
+    return NextResponse.json(
+      { message: "Could not generate a unique voucher code. Please try again." },
+      { status: 503 }
+    );
+  }
 
   await createAuditLog(db, {
     userId: user.id,
